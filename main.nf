@@ -163,6 +163,19 @@ process EGGNOG {
     """
 }
 
+process ANTISMASH {
+    tag "ANTISMASH"
+    publishDir "${params.outdir}/14_secondary_metabolites", mode: 'copy'
+    input:
+    tuple val(sample), path(assembly)
+    script:
+    """
+    antismash --cpus ${params.threads} \
+              --output-dir antismash_out \
+              ${assembly} || echo "antiSMASH failed" > antismash_out/error.txt
+    """
+}
+
 process MULTIQC {
     tag "MULTIQC"
     publishDir "${params.outdir}/13_report", mode: 'copy'
@@ -195,6 +208,7 @@ workflow {
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
+    ANTISMASH(ASSEMBLE.out)
 
     proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
     EGGNOG(proteins_ch)
