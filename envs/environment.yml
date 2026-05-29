@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - nextflow=24.04.2
+  - nextflow=26.04.3
   - fastqc=0.12.1
   - fastp=0.23.4
   - spades=3.15.5
@@ -12,8 +12,8 @@ dependencies:
   - prodigal=2.6.3
   - barrnap=0.9
   - trnascan-se=2.0.9
-  - eggnog-mapper=2.1.12
   - abricate=1.0.1
   - mlst=2.23.0
-  - minced=0.4.2
+  - eggnog-mapper=2.1.12
+  - antismash=7.1.0
   - multiqc=1.18
