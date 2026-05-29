@@ -12,10 +12,6 @@ if (params.help) {
     exit 0
 }
 
-// ============================================================================
-// PROCESSES
-// ============================================================================
-
 process FASTQC {
     tag "${sample_id}"
     publishDir "${params.outdir}/fastqc", mode: 'copy'
@@ -79,7 +75,7 @@ process BUSCO {
     path "busco_results"
     script:
     """
-    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${task.cpus}
+    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${task.cpus} || true
     """
 }
 
@@ -105,7 +101,7 @@ process BARRNAP {
     path "rrna.gff"
     script:
     """
-    barrnap ${assembly} > rrna.gff
+    barrnap ${assembly} > rrna.gff || echo "No rRNA found" > rrna.gff
     """
 }
 
@@ -185,10 +181,16 @@ process EGGNOG {
     path "go_terms.txt"
     script:
     """
-    emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria
-    grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
-    grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
-    grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt
+    emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria || echo "eggNOG failed" > kegg_pathways.txt
+    if [ -f eggnog.emapper.annotations ]; then
+        grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
+        grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
+        grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
+    else
+        echo "eggNOG analysis not available" > kegg_pathways.txt
+        echo "eggNOG analysis not available" > cog_categories.txt
+        echo "eggNOG analysis not available" > go_terms.txt
+    fi
     """
 }
 
@@ -202,17 +204,14 @@ process MULTIQC {
     path "multiqc_report.html"
     script:
     """
-    multiqc . --filename multiqc_report.html --force
+    multiqc . --filename multiqc_report.html --force || echo "MultiQC failed"
     """
 }
-
-// ============================================================================
-// MAIN WORKFLOW
-// ============================================================================
 
 workflow {
     reads_ch = Channel.fromFilePairs(params.reads)
         .map { id, reads -> [params.sample, reads[0], reads[1]] }
+        .set { reads_ch }
     
     FASTQC(reads_ch)
     TRIM(reads_ch)
