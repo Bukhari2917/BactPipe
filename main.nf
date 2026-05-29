@@ -1,10 +1,6 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-// ============================================================================
-// BactPipe - Complete Bacterial Genome Analysis Pipeline
-// ============================================================================
-
 params.reads = null
 params.outdir = "./results"
 params.sample = "BACTERIA"
@@ -13,21 +9,8 @@ params.help = false
 
 if (params.help) {
     log.info """
-    ╔═══════════════════════════════════════════════════════════════════════╗
-    ║                    BactPipe - Bacterial Genome Analysis               ║
-    ╚═══════════════════════════════════════════════════════════════════════╝
-    
-    USAGE:
-        nextflow run main.nf --reads 'data/*_R{1,2}.fastq'
-    
-    OPTIONS:
-        --reads         Path to FASTQ files (required)
-        --outdir        Output directory (default: ./results)
-        --sample        Sample name (default: BACTERIA)
-        --threads       CPU threads (default: 8)
-        --help          Show this help
-    
-    ============================================================================
+    BactPipe - Bacterial Genome Analysis
+    USAGE: nextflow run main.nf --reads 'data/*_R{1,2}.fastq'
     """
     exit 0
 }
@@ -49,26 +32,23 @@ include { MULTIQC } from './modules/multiqc.nf'
 
 workflow {
     Channel.fromFilePairs(params.reads)
-        .map { id, reads -> 
-            def sample_name = params.sample == "BACTERIA" ? id : params.sample
-            [sample_name, reads[0], reads[1]]
-        }
+        .map { id, reads -> [params.sample, reads[0], reads[1]] }
         .set { reads_ch }
     
     FASTQC(reads_ch)
     TRIM(reads_ch)
     ASSEMBLE(TRIM.out)
-    QUAST(ASSEMBLE.out)
-    BUSCO(ASSEMBLE.out)
-    PRODIGAL(ASSEMBLE.out)
-    BARRNAP(ASSEMBLE.out)
-    TRNA(ASSEMBLE.out)
-    EGGNOG(PRODIGAL.out.map { it[0] })
+    QUAST(ASSEMBLE.out.map { [it[0], it[1]] })
+    BUSCO(ASSEMBLE.out.map { [it[0], it[1]] })
+    PRODIGAL(ASSEMBLE.out.map { [it[0], it[1]] })
+    BARRNAP(ASSEMBLE.out.map { [it[0], it[1]] })
+    TRNA(ASSEMBLE.out.map { [it[0], it[1]] })
+    EGGNOG(PRODIGAL.out.map { it[1] })
     ABRICATE_AMR(ASSEMBLE.out)
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
     MULTIQC(FASTQC.out.collect(), TRIM.out.map { it[2] }.collect(), ASSEMBLE.out.map { it[1] }.collect())
     
-    log.info "✅ Pipeline completed! Results: ${params.outdir}"
+    log.info "Pipeline completed!"
 }
