@@ -8,9 +8,27 @@ params.threads = 8
 params.help = false
 
 if (params.help) {
-    log.info "BactPipe - Complete Bacterial Genome Analysis Pipeline"
+    log.info """
+    BactPipe - Complete Bacterial Genome Analysis Pipeline
+    
+    USAGE:
+        nextflow run main.nf --reads 'data/*_R{1,2}.fastq'
+    
+    OUTPUTS:
+        • Assembly (contigs.fasta)
+        • Gene predictions (proteins.faa)
+        • AMR genes (amr_card.tsv)
+        • Virulence genes (virulence.tsv)
+        • MLST typing (mlst.txt)
+        • CRISPR (crispr.txt)
+        • Quality report (multiqc_report.html)
+    """
     exit 0
 }
+
+// ============================================================================
+// QUALITY CONTROL
+// ============================================================================
 
 process FASTQC {
     tag "${sample_id}"
@@ -26,6 +44,10 @@ process FASTQC {
     """
 }
 
+// ============================================================================
+// TRIMMING
+// ============================================================================
+
 process TRIM {
     tag "${sample_id}"
     publishDir "${params.outdir}/trimmed", mode: 'copy'
@@ -38,6 +60,10 @@ process TRIM {
     fastp -i ${r1} -I ${r2} -o ${sample_id}_R1.fastq -O ${sample_id}_R2.fastq -q 20 -l 50 --thread ${task.cpus}
     """
 }
+
+// ============================================================================
+// ASSEMBLY
+// ============================================================================
 
 process ASSEMBLE {
     tag "${sample_id}"
@@ -53,31 +79,9 @@ process ASSEMBLE {
     """
 }
 
-process QUAST {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/stats", mode: 'copy'
-    input:
-    tuple val(sample_id), path(assembly)
-    output:
-    path "quast_results"
-    script:
-    """
-    quast.py ${assembly} -o quast_results --threads ${task.cpus}
-    """
-}
-
-process BUSCO {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/stats", mode: 'copy'
-    input:
-    tuple val(sample_id), path(assembly)
-    output:
-    path "busco_results"
-    script:
-    """
-    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${task.cpus} || echo "BUSCO failed" > busco_results.txt
-    """
-}
+// ============================================================================
+// GENE PREDICTION
+// ============================================================================
 
 process PRODIGAL {
     tag "${sample_id}"
@@ -86,41 +90,20 @@ process PRODIGAL {
     tuple val(sample_id), path(assembly)
     output:
     tuple val(sample_id), path("proteins.faa")
+    path "genes.gbk"
     script:
     """
     prodigal -i ${assembly} -a proteins.faa -o genes.gbk -p single
     """
 }
 
-process BARRNAP {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/genes", mode: 'copy'
-    input:
-    tuple val(sample_id), path(assembly)
-    output:
-    path "rrna.gff"
-    script:
-    """
-    barrnap ${assembly} > rrna.gff || echo "No rRNA found" > rrna.gff
-    """
-}
-
-process TRNA {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/genes", mode: 'copy'
-    input:
-    tuple val(sample_id), path(assembly)
-    output:
-    path "trna.out"
-    script:
-    """
-    tRNAscan-SE -o trna.out ${assembly} 2>/dev/null || echo "No tRNA found" > trna.out
-    """
-}
+// ============================================================================
+// AMR DETECTION
+// ============================================================================
 
 process ABRICATE_AMR {
     tag "${sample_id}"
-    publishDir "${params.outdir}/specialized", mode: 'copy'
+    publishDir "${params.outdir}/amr", mode: 'copy'
     input:
     tuple val(sample_id), path(assembly)
     output:
@@ -131,9 +114,13 @@ process ABRICATE_AMR {
     """
 }
 
+// ============================================================================
+// VIRULENCE FACTORS
+// ============================================================================
+
 process ABRICATE_VIR {
     tag "${sample_id}"
-    publishDir "${params.outdir}/specialized", mode: 'copy'
+    publishDir "${params.outdir}/virulence", mode: 'copy'
     input:
     tuple val(sample_id), path(assembly)
     output:
@@ -144,9 +131,13 @@ process ABRICATE_VIR {
     """
 }
 
+// ============================================================================
+// CRISPR DETECTION
+// ============================================================================
+
 process CRISPR {
     tag "${sample_id}"
-    publishDir "${params.outdir}/specialized", mode: 'copy'
+    publishDir "${params.outdir}/crispr", mode: 'copy'
     input:
     tuple val(sample_id), path(assembly)
     output:
@@ -157,9 +148,13 @@ process CRISPR {
     """
 }
 
+// ============================================================================
+// MLST TYPING
+// ============================================================================
+
 process MLST {
     tag "${sample_id}"
-    publishDir "${params.outdir}/specialized", mode: 'copy'
+    publishDir "${params.outdir}/mlst", mode: 'copy'
     input:
     tuple val(sample_id), path(assembly)
     output:
@@ -170,35 +165,9 @@ process MLST {
     """
 }
 
-process EGGNOG {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/function", mode: 'copy'
-    input:
-    path proteins
-    output:
-    path "kegg_pathways.txt"
-    path "cog_categories.txt"
-    path "go_terms.txt"
-    script:
-    """
-    if [ -f ${proteins} ]; then
-        emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria || echo "eggNOG failed"
-        if [ -f eggnog.emapper.annotations ]; then
-            grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
-            grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
-            grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
-        else
-            echo "eggNOG analysis not available" > kegg_pathways.txt
-            echo "eggNOG analysis not available" > cog_categories.txt
-            echo "eggNOG analysis not available" > go_terms.txt
-        fi
-    else
-        echo "No protein file provided" > kegg_pathways.txt
-        echo "No protein file provided" > cog_categories.txt
-        echo "No protein file provided" > go_terms.txt
-    fi
-    """
-}
+// ============================================================================
+// MULTIQC REPORT
+// ============================================================================
 
 process MULTIQC {
     publishDir "${params.outdir}/report", mode: 'copy'
@@ -210,48 +179,29 @@ process MULTIQC {
     path "multiqc_report.html"
     script:
     """
-    multiqc . --filename multiqc_report.html --force || echo "MultiQC failed"
+    multiqc . --filename multiqc_report.html --force
     """
 }
 
+// ============================================================================
+// MAIN WORKFLOW
+// ============================================================================
+
 workflow {
-    // Check if reads parameter is provided
-    if (!params.reads) {
-        error "Please provide --reads parameter with path to FASTQ files"
-    }
-    
     // Create channel from input reads
     Channel.fromFilePairs(params.reads)
         .map { id, reads -> [params.sample, reads[0], reads[1]] }
         .set { reads_ch }
     
-    // Run QC
+    // Run all processes
     FASTQC(reads_ch)
-    
-    // Run trimming
     TRIM(reads_ch)
-    
-    // Run assembly
     ASSEMBLE(TRIM.out)
-    
-    // Run assembly analysis
-    QUAST(ASSEMBLE.out.map { [it[0], it[1]] })
-    BUSCO(ASSEMBLE.out.map { [it[0], it[1]] })
-    PRODIGAL(ASSEMBLE.out.map { [it[0], it[1]] })
-    BARRNAP(ASSEMBLE.out.map { [it[0], it[1]] })
-    TRNA(ASSEMBLE.out.map { [it[0], it[1]] })
+    PRODIGAL(ASSEMBLE.out)
     ABRICATE_AMR(ASSEMBLE.out)
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
-    
-    // Run functional annotation
-    PRODIGAL.out
-        .map { it[1] }
-        .set { proteins_ch }
-    EGGNOG(proteins_ch)
-    
-    // Run MultiQC
     MULTIQC(FASTQC.out.collect(), TRIM.out.map { it[2] }.collect(), ASSEMBLE.out.map { it[1] }.collect())
     
     log.info "=========================================="
