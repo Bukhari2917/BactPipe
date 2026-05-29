@@ -1,3 +1,6 @@
+cd /data/sayed/bacteria_test/BactPipe
+
+cat > main.nf << 'EOF'
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
@@ -173,27 +176,19 @@ process MULTIQC {
 }
 
 workflow {
-    // Check if reads parameter is provided
     if (!params.reads) {
         error "Please provide --reads parameter"
     }
     
-    // Create channel from input reads
     Channel.fromFilePairs(params.reads)
         .map { sample_id, reads -> [params.sample, reads[0], reads[1]] }
         .set { reads_ch }
     
-    // Run QC and trimming
     FASTQC(reads_ch)
     TRIM(reads_ch)
-    
-    // Assembly
     ASSEMBLE(TRIM.out)
-    
-    // Create assembly channel
     assembly_ch = ASSEMBLE.out.map { [it[0], it[1]] }
     
-    // Run all analyses
     QUAST(assembly_ch)
     BUSCO(assembly_ch)
     PRODIGAL(assembly_ch)
@@ -204,11 +199,8 @@ workflow {
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
     
-    // Functional annotation
     proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
     EGGNOG(proteins_ch)
-    
-    // Final report
     MULTIQC()
     
     log.info "=========================================="
@@ -216,3 +208,4 @@ workflow {
     log.info "Results: ${params.outdir}"
     log.info "=========================================="
 }
+EOF
