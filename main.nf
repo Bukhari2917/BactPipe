@@ -13,7 +13,7 @@ if (params.help) {
 }
 
 // ============================================================================
-// ALL PROCESSES (No external module files needed)
+// ALL PROCESSES
 // ============================================================================
 
 process FASTQC {
@@ -121,7 +121,7 @@ process EGGNOG {
     emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria
     grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
     grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
-    grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\\n' | sort | uniq -c | sort -rn > go_terms.txt
+    grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt
     """
 }
 
