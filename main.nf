@@ -75,7 +75,7 @@ process BUSCO {
     path "busco_results"
     script:
     """
-    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${task.cpus} || true
+    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${task.cpus} || echo "BUSCO failed" > busco_results.txt
     """
 }
 
@@ -181,15 +181,21 @@ process EGGNOG {
     path "go_terms.txt"
     script:
     """
-    emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria || echo "eggNOG failed" > kegg_pathways.txt
-    if [ -f eggnog.emapper.annotations ]; then
-        grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
-        grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
-        grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
+    if [ -f ${proteins} ]; then
+        emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria || echo "eggNOG failed"
+        if [ -f eggnog.emapper.annotations ]; then
+            grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
+        else
+            echo "eggNOG analysis not available" > kegg_pathways.txt
+            echo "eggNOG analysis not available" > cog_categories.txt
+            echo "eggNOG analysis not available" > go_terms.txt
+        fi
     else
-        echo "eggNOG analysis not available" > kegg_pathways.txt
-        echo "eggNOG analysis not available" > cog_categories.txt
-        echo "eggNOG analysis not available" > go_terms.txt
+        echo "No protein file provided" > kegg_pathways.txt
+        echo "No protein file provided" > cog_categories.txt
+        echo "No protein file provided" > go_terms.txt
     fi
     """
 }
@@ -209,13 +215,26 @@ process MULTIQC {
 }
 
 workflow {
-    reads_ch = Channel.fromFilePairs(params.reads)
+    // Check if reads parameter is provided
+    if (!params.reads) {
+        error "Please provide --reads parameter with path to FASTQ files"
+    }
+    
+    // Create channel from input reads
+    Channel.fromFilePairs(params.reads)
         .map { id, reads -> [params.sample, reads[0], reads[1]] }
         .set { reads_ch }
     
+    // Run QC
     FASTQC(reads_ch)
+    
+    // Run trimming
     TRIM(reads_ch)
+    
+    // Run assembly
     ASSEMBLE(TRIM.out)
+    
+    // Run assembly analysis
     QUAST(ASSEMBLE.out.map { [it[0], it[1]] })
     BUSCO(ASSEMBLE.out.map { [it[0], it[1]] })
     PRODIGAL(ASSEMBLE.out.map { [it[0], it[1]] })
@@ -225,7 +244,14 @@ workflow {
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
-    EGGNOG(PRODIGAL.out.map { it[1] })
+    
+    // Run functional annotation
+    PRODIGAL.out
+        .map { it[1] }
+        .set { proteins_ch }
+    EGGNOG(proteins_ch)
+    
+    // Run MultiQC
     MULTIQC(FASTQC.out.collect(), TRIM.out.map { it[2] }.collect(), ASSEMBLE.out.map { it[1] }.collect())
     
     log.info "=========================================="
