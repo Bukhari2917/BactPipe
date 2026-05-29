@@ -9,158 +9,187 @@ params.threads = 8
 process FASTQC {
     tag "FASTQC"
     input: tuple val(sample), path(r1), path(r2)
+    output:
+    path "fastqc_results"
     script:
     """
-    mkdir -p ${params.outdir}/01_fastqc
-    fastqc ${r1} ${r2} -o ${params.outdir}/01_fastqc -t ${params.threads}
+    mkdir -p fastqc_results
+    fastqc ${r1} ${r2} -o fastqc_results/ -t ${params.threads}
     """
+    publishDir "${params.outdir}/01_fastqc", mode: 'copy'
 }
 
 process TRIM {
     tag "TRIM"
     input: tuple val(sample), path(r1), path(r2)
-    output: tuple val(sample), path("trimmed_R1.fastq"), path("trimmed_R2.fastq")
+    output:
+    tuple val(sample), path("trimmed_R1.fastq"), path("trimmed_R2.fastq")
     script:
     """
-    mkdir -p ${params.outdir}/02_trimmed
-    fastp -i ${r1} -I ${r2} -o ${params.outdir}/02_trimmed/trimmed_R1.fastq -O ${params.outdir}/02_trimmed/trimmed_R2.fastq -q 20 -l 50 --thread ${params.threads}
+    fastp -i ${r1} -I ${r2} -o trimmed_R1.fastq -O trimmed_R2.fastq -q 20 -l 50 --thread ${params.threads}
     """
+    publishDir "${params.outdir}/02_trimmed", mode: 'copy'
 }
 
 process ASSEMBLE {
     tag "ASSEMBLE"
     input: tuple val(sample), path(r1), path(r2)
-    output: tuple val(sample), path("contigs.fasta")
+    output:
+    tuple val(sample), path("contigs.fasta")
     script:
     """
-    mkdir -p ${params.outdir}/03_assembly
     spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${params.threads}
-    cp spades_out/contigs.fasta ${params.outdir}/03_assembly/
+    cp spades_out/contigs.fasta .
     """
+    publishDir "${params.outdir}/03_assembly", mode: 'copy', pattern: "contigs.fasta"
 }
 
 process QUAST {
     tag "QUAST"
     input: tuple val(sample), path(assembly)
+    output:
+    path "quast_results"
     script:
     """
-    mkdir -p ${params.outdir}/04_quast
-    quast.py ${assembly} -o ${params.outdir}/04_quast --threads ${params.threads}
+    quast.py ${assembly} -o quast_results --threads ${params.threads}
     """
+    publishDir "${params.outdir}/04_quast", mode: 'copy'
 }
 
 process BUSCO {
     tag "BUSCO"
     input: tuple val(sample), path(assembly)
+    output:
+    path "busco_results"
     script:
     """
-    mkdir -p ${params.outdir}/05_busco
-    busco -i ${assembly} -o ${params.outdir}/05_busco -l bacteria_odb10 -m genome --cpu ${params.threads} || true
+    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${params.threads} || true
     """
+    publishDir "${params.outdir}/05_busco", mode: 'copy'
 }
 
 process PRODIGAL {
     tag "PRODIGAL"
     input: tuple val(sample), path(assembly)
-    output: tuple val(sample), path("proteins.faa")
+    output:
+    tuple val(sample), path("proteins.faa")
     script:
     """
-    mkdir -p ${params.outdir}/06_genes
-    prodigal -i ${assembly} -a ${params.outdir}/06_genes/proteins.faa -o ${params.outdir}/06_genes/genes.gbk -p single
+    prodigal -i ${assembly} -a proteins.faa -o genes.gbk -p single
     """
+    publishDir "${params.outdir}/06_genes", mode: 'copy', pattern: "proteins.faa"
 }
 
 process BARRNAP {
     tag "BARRNAP"
     input: tuple val(sample), path(assembly)
+    output:
+    path "rrna.gff"
     script:
     """
-    mkdir -p ${params.outdir}/07_rna
-    barrnap ${assembly} > ${params.outdir}/07_rna/rrna.gff || echo 'No rRNA' > ${params.outdir}/07_rna/rrna.gff
+    barrnap ${assembly} > rrna.gff || echo "No rRNA" > rrna.gff
     """
+    publishDir "${params.outdir}/07_rna", mode: 'copy', pattern: "rrna.gff"
 }
 
 process TRNA {
     tag "TRNA"
     input: tuple val(sample), path(assembly)
+    output:
+    path "trna.out"
     script:
     """
-    mkdir -p ${params.outdir}/07_rna
-    tRNAscan-SE -o ${params.outdir}/07_rna/trna.out ${assembly} 2>/dev/null || echo 'No tRNA' > ${params.outdir}/07_rna/trna.out
+    tRNAscan-SE -o trna.out ${assembly} 2>/dev/null || echo "No tRNA" > trna.out
     """
+    publishDir "${params.outdir}/07_rna", mode: 'copy', pattern: "trna.out"
 }
 
 process ABRICATE_AMR {
     tag "ABRICATE_AMR"
     input: tuple val(sample), path(assembly)
+    output:
+    path "amr_card.tsv"
     script:
     """
-    mkdir -p ${params.outdir}/08_amr
-    abricate --db card ${assembly} > ${params.outdir}/08_amr/amr_card.tsv 2>/dev/null || echo 'No AMR genes' > ${params.outdir}/08_amr/amr_card.tsv
+    abricate --db card ${assembly} > amr_card.tsv 2>/dev/null || echo "No AMR genes" > amr_card.tsv
     """
+    publishDir "${params.outdir}/08_amr", mode: 'copy', pattern: "amr_card.tsv"
 }
 
 process ABRICATE_VIR {
     tag "ABRICATE_VIR"
     input: tuple val(sample), path(assembly)
+    output:
+    path "virulence.tsv"
     script:
     """
-    mkdir -p ${params.outdir}/09_virulence
-    abricate --db vfdb ${assembly} > ${params.outdir}/09_virulence/virulence.tsv 2>/dev/null || echo 'No virulence genes' > ${params.outdir}/09_virulence/virulence.tsv
+    abricate --db vfdb ${assembly} > virulence.tsv 2>/dev/null || echo "No virulence genes" > virulence.tsv
     """
+    publishDir "${params.outdir}/09_virulence", mode: 'copy', pattern: "virulence.tsv"
 }
 
 process CRISPR {
     tag "CRISPR"
     input: tuple val(sample), path(assembly)
+    output:
+    path "crispr.txt"
     script:
     """
-    mkdir -p ${params.outdir}/10_crispr
-    echo 'CRISPR analysis completed' > ${params.outdir}/10_crispr/crispr.txt
+    echo "CRISPR analysis completed" > crispr.txt
     """
+    publishDir "${params.outdir}/10_crispr", mode: 'copy', pattern: "crispr.txt"
 }
 
 process MLST {
     tag "MLST"
     input: tuple val(sample), path(assembly)
+    output:
+    path "mlst.txt"
     script:
     """
-    mkdir -p ${params.outdir}/11_mlst
-    mlst ${assembly} > ${params.outdir}/11_mlst/mlst.txt 2>/dev/null || echo 'No MLST scheme' > ${params.outdir}/11_mlst/mlst.txt
+    mlst ${assembly} > mlst.txt 2>/dev/null || echo "No MLST scheme" > mlst.txt
     """
+    publishDir "${params.outdir}/11_mlst", mode: 'copy', pattern: "mlst.txt"
 }
 
 process EGGNOG {
     tag "EGGNOG"
     input: tuple val(sample), path(proteins)
+    output:
+    path "kegg_pathways.txt"
+    path "cog_categories.txt"
+    path "go_terms.txt"
     script:
     """
-    mkdir -p ${params.outdir}/12_function
     if [ -f ${proteins} ]; then
         emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria || true
         if [ -f eggnog.emapper.annotations ]; then
-            grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > ${params.outdir}/12_function/kegg_pathways.txt || true
-            grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > ${params.outdir}/12_function/cog_categories.txt || true
-            grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > ${params.outdir}/12_function/go_terms.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
         fi
     fi
     """
+    publishDir "${params.outdir}/12_function", mode: 'copy', pattern: "*.txt"
 }
 
 process ANTISMASH {
     tag "ANTISMASH"
     input: tuple val(sample), path(assembly)
+    output:
+    path "antismash_out"
     script:
     """
-    mkdir -p ${params.outdir}/13_secondary_metabolites
-    antismash --cpus ${params.threads} --output-dir ${params.outdir}/13_secondary_metabolites ${assembly} || echo 'antiSMASH failed' > ${params.outdir}/13_secondary_metabolites/error.txt
+    antismash --cpus ${params.threads} --output-dir antismash_out ${assembly} || echo 'antiSMASH failed'
     """
+    publishDir "${params.outdir}/13_secondary_metabolites", mode: 'copy'
 }
 
 process MULTIQC {
+    publishDir "${params.outdir}/14_report", mode: 'copy'
     script:
     """
-    multiqc ${params.outdir} --filename ${params.outdir}/multiqc_report.html --force || true
+    multiqc . --filename multiqc_report.html --force || true
     """
 }
 
