@@ -8,10 +8,7 @@ params.threads = 8
 params.help = false
 
 if (params.help) {
-    log.info """
-    BactPipe - Bacterial Genome Analysis
-    USAGE: nextflow run main.nf --reads 'data/*_R{1,2}.fastq'
-    """
+    log.info "BactPipe - Bacterial Genome Analysis"
     exit 0
 }
 
