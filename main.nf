@@ -1,5 +1,9 @@
 cd /data/sayed/bacteria_test/BactPipe
 
+# Delete the corrupted file
+rm -f main.nf
+
+# Create a new clean file
 cat > main.nf << 'EOF'
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
@@ -179,16 +183,16 @@ workflow {
     if (!params.reads) {
         error "Please provide --reads parameter"
     }
-    
+
     Channel.fromFilePairs(params.reads)
         .map { sample_id, reads -> [params.sample, reads[0], reads[1]] }
         .set { reads_ch }
-    
+
     FASTQC(reads_ch)
     TRIM(reads_ch)
     ASSEMBLE(TRIM.out)
     assembly_ch = ASSEMBLE.out.map { [it[0], it[1]] }
-    
+
     QUAST(assembly_ch)
     BUSCO(assembly_ch)
     PRODIGAL(assembly_ch)
@@ -198,11 +202,11 @@ workflow {
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
-    
+
     proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
     EGGNOG(proteins_ch)
     MULTIQC()
-    
+
     log.info "=========================================="
     log.info "BactPipe COMPLETE Pipeline Finished!"
     log.info "Results: ${params.outdir}"
