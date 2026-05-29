@@ -1,11 +1,4 @@
-cd /data/sayed/bacteria_test/BactPipe
-
-# Delete the corrupted file
-rm -f main.nf
-
-# Create a new clean file
-cat > main.nf << 'EOF'
-#!/usr/bin/env nextflow
+cd /data/sayed/bacteria_test/BactPipe && rm -f main.nf && echo '#!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
 params.reads = null
@@ -15,7 +8,7 @@ params.threads = 8
 
 process FASTQC {
     tag "FASTQC"
-    publishDir "${params.outdir}/01_fastqc", mode: 'copy'
+    publishDir "${params.outdir}/01_fastqc", mode: "copy"
     input:
     tuple val(sample), path(r1), path(r2)
     script:
@@ -26,7 +19,7 @@ process FASTQC {
 
 process TRIM {
     tag "TRIM"
-    publishDir "${params.outdir}/02_trimmed", mode: 'copy'
+    publishDir "${params.outdir}/02_trimmed", mode: "copy"
     input:
     tuple val(sample), path(r1), path(r2)
     output:
@@ -39,7 +32,7 @@ process TRIM {
 
 process ASSEMBLE {
     tag "ASSEMBLE"
-    publishDir "${params.outdir}/03_assembly", mode: 'copy'
+    publishDir "${params.outdir}/03_assembly", mode: "copy"
     input:
     tuple val(sample), path(r1), path(r2)
     output:
@@ -53,7 +46,7 @@ process ASSEMBLE {
 
 process QUAST {
     tag "QUAST"
-    publishDir "${params.outdir}/04_quast", mode: 'copy'
+    publishDir "${params.outdir}/04_quast", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -64,7 +57,7 @@ process QUAST {
 
 process BUSCO {
     tag "BUSCO"
-    publishDir "${params.outdir}/05_busco", mode: 'copy'
+    publishDir "${params.outdir}/05_busco", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -75,7 +68,7 @@ process BUSCO {
 
 process PRODIGAL {
     tag "PRODIGAL"
-    publishDir "${params.outdir}/06_genes", mode: 'copy'
+    publishDir "${params.outdir}/06_genes", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     output:
@@ -88,7 +81,7 @@ process PRODIGAL {
 
 process BARRNAP {
     tag "BARRNAP"
-    publishDir "${params.outdir}/07_rna", mode: 'copy'
+    publishDir "${params.outdir}/07_rna", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -99,7 +92,7 @@ process BARRNAP {
 
 process TRNA {
     tag "TRNA"
-    publishDir "${params.outdir}/07_rna", mode: 'copy'
+    publishDir "${params.outdir}/07_rna", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -110,7 +103,7 @@ process TRNA {
 
 process ABRICATE_AMR {
     tag "ABRICATE_AMR"
-    publishDir "${params.outdir}/08_amr", mode: 'copy'
+    publishDir "${params.outdir}/08_amr", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -121,7 +114,7 @@ process ABRICATE_AMR {
 
 process ABRICATE_VIR {
     tag "ABRICATE_VIR"
-    publishDir "${params.outdir}/09_virulence", mode: 'copy'
+    publishDir "${params.outdir}/09_virulence", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -132,7 +125,7 @@ process ABRICATE_VIR {
 
 process CRISPR {
     tag "CRISPR"
-    publishDir "${params.outdir}/10_crispr", mode: 'copy'
+    publishDir "${params.outdir}/10_crispr", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -143,7 +136,7 @@ process CRISPR {
 
 process MLST {
     tag "MLST"
-    publishDir "${params.outdir}/11_mlst", mode: 'copy'
+    publishDir "${params.outdir}/11_mlst", mode: "copy"
     input:
     tuple val(sample), path(assembly)
     script:
@@ -154,7 +147,7 @@ process MLST {
 
 process EGGNOG {
     tag "EGGNOG"
-    publishDir "${params.outdir}/12_function", mode: 'copy'
+    publishDir "${params.outdir}/12_function", mode: "copy"
     input:
     tuple val(sample), path(proteins)
     script:
@@ -162,9 +155,9 @@ process EGGNOG {
     if [ -f ${proteins} ]; then
         emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria || true
         if [ -f eggnog.emapper.annotations ]; then
-            grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
-            grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
-            grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
+            grep -v '"'"'^#'"'"' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
+            grep -v '"'"'^#'"'"' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
+            grep -v '"'"'^#'"'"' eggnog.emapper.annotations | cut -f9 | tr '"'"','"'"' '"'"'\n'"'"' | sort | uniq -c | sort -rn > go_terms.txt || true
         fi
     fi
     """
@@ -172,7 +165,7 @@ process EGGNOG {
 
 process MULTIQC {
     tag "MULTIQC"
-    publishDir "${params.outdir}/13_report", mode: 'copy'
+    publishDir "${params.outdir}/13_report", mode: "copy"
     script:
     """
     multiqc . --filename multiqc_report.html --force || true
@@ -211,5 +204,4 @@ workflow {
     log.info "BactPipe COMPLETE Pipeline Finished!"
     log.info "Results: ${params.outdir}"
     log.info "=========================================="
-}
-EOF
+}' > main.nf && head -5 main.nf
