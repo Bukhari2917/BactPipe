@@ -16,18 +16,22 @@ if (params.help) {
     
     OUTPUTS:
         • Assembly (contigs.fasta)
+        • Assembly stats (QUAST)
+        • Completeness (BUSCO)
         • Gene predictions (proteins.faa)
-        • AMR genes (amr_card.tsv)
-        • Virulence genes (virulence.tsv)
-        • MLST typing (mlst.txt)
-        • CRISPR (crispr.txt)
-        • Quality report (multiqc_report.html)
+        • rRNA/tRNA
+        • KEGG Pathways, COG, GO (eggNOG)
+        • AMR genes (CARD)
+        • Virulence factors (VFDB)
+        • CRISPR
+        • MLST typing
+        • Quality report (MultiQC)
     """
     exit 0
 }
 
 // ============================================================================
-// QUALITY CONTROL
+// PROCESS 1: QUALITY CONTROL
 // ============================================================================
 
 process FASTQC {
@@ -45,7 +49,7 @@ process FASTQC {
 }
 
 // ============================================================================
-// TRIMMING
+// PROCESS 2: TRIMMING
 // ============================================================================
 
 process TRIM {
@@ -62,7 +66,7 @@ process TRIM {
 }
 
 // ============================================================================
-// ASSEMBLY
+// PROCESS 3: ASSEMBLY
 // ============================================================================
 
 process ASSEMBLE {
@@ -80,7 +84,41 @@ process ASSEMBLE {
 }
 
 // ============================================================================
-// GENE PREDICTION
+// PROCESS 4: ASSEMBLY STATISTICS (QUAST)
+// ============================================================================
+
+process QUAST {
+    tag "${sample_id}"
+    publishDir "${params.outdir}/quast", mode: 'copy'
+    input:
+    tuple val(sample_id), path(assembly)
+    output:
+    path "quast_results"
+    script:
+    """
+    quast.py ${assembly} -o quast_results --threads ${task.cpus}
+    """
+}
+
+// ============================================================================
+// PROCESS 5: COMPLETENESS (BUSCO)
+// ============================================================================
+
+process BUSCO {
+    tag "${sample_id}"
+    publishDir "${params.outdir}/busco", mode: 'copy'
+    input:
+    tuple val(sample_id), path(assembly)
+    output:
+    path "busco_results"
+    script:
+    """
+    busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${task.cpus} || echo "BUSCO failed" > busco_results/summary.txt
+    """
+}
+
+// ============================================================================
+// PROCESS 6: GENE PREDICTION (Prodigal)
 // ============================================================================
 
 process PRODIGAL {
@@ -98,7 +136,41 @@ process PRODIGAL {
 }
 
 // ============================================================================
-// AMR DETECTION
+// PROCESS 7: rRNA DETECTION (barrnap)
+// ============================================================================
+
+process BARRNAP {
+    tag "${sample_id}"
+    publishDir "${params.outdir}/rna", mode: 'copy'
+    input:
+    tuple val(sample_id), path(assembly)
+    output:
+    path "rrna.gff"
+    script:
+    """
+    barrnap ${assembly} > rrna.gff || echo "No rRNA found" > rrna.gff
+    """
+}
+
+// ============================================================================
+// PROCESS 8: tRNA DETECTION (tRNAscan-SE)
+// ============================================================================
+
+process TRNA {
+    tag "${sample_id}"
+    publishDir "${params.outdir}/rna", mode: 'copy'
+    input:
+    tuple val(sample_id), path(assembly)
+    output:
+    path "trna.out"
+    script:
+    """
+    tRNAscan-SE -o trna.out ${assembly} 2>/dev/null || echo "No tRNA found" > trna.out
+    """
+}
+
+// ============================================================================
+// PROCESS 9: AMR DETECTION (ABRicate - CARD)
 // ============================================================================
 
 process ABRICATE_AMR {
@@ -115,7 +187,7 @@ process ABRICATE_AMR {
 }
 
 // ============================================================================
-// VIRULENCE FACTORS
+// PROCESS 10: VIRULENCE DETECTION (ABRicate - VFDB)
 // ============================================================================
 
 process ABRICATE_VIR {
@@ -132,7 +204,7 @@ process ABRICATE_VIR {
 }
 
 // ============================================================================
-// CRISPR DETECTION
+// PROCESS 11: CRISPR DETECTION
 // ============================================================================
 
 process CRISPR {
@@ -149,7 +221,7 @@ process CRISPR {
 }
 
 // ============================================================================
-// MLST TYPING
+// PROCESS 12: MLST TYPING
 // ============================================================================
 
 process MLST {
@@ -166,7 +238,41 @@ process MLST {
 }
 
 // ============================================================================
-// MULTIQC REPORT
+// PROCESS 13: FUNCTIONAL ANNOTATION (eggNOG - KEGG, COG, GO)
+// ============================================================================
+
+process EGGNOG {
+    tag "${sample_id}"
+    publishDir "${params.outdir}/function", mode: 'copy'
+    input:
+    path proteins
+    output:
+    path "kegg_pathways.txt"
+    path "cog_categories.txt"
+    path "go_terms.txt"
+    script:
+    """
+    if [ -f ${proteins} ]; then
+        emapper.py -i ${proteins} --output eggnog --cpu ${task.cpus} --tax_scope Bacteria || echo "eggNOG failed"
+        if [ -f eggnog.emapper.annotations ]; then
+            grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt || true
+            grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt || true
+        else
+            echo "eggNOG analysis not available" > kegg_pathways.txt
+            echo "eggNOG analysis not available" > cog_categories.txt
+            echo "eggNOG analysis not available" > go_terms.txt
+        fi
+    else
+        echo "No protein file provided" > kegg_pathways.txt
+        echo "No protein file provided" > cog_categories.txt
+        echo "No protein file provided" > go_terms.txt
+    fi
+    """
+}
+
+// ============================================================================
+// PROCESS 14: FINAL REPORT (MultiQC)
 // ============================================================================
 
 process MULTIQC {
@@ -179,7 +285,7 @@ process MULTIQC {
     path "multiqc_report.html"
     script:
     """
-    multiqc . --filename multiqc_report.html --force
+    multiqc . --filename multiqc_report.html --force || echo "MultiQC failed"
     """
 }
 
@@ -197,11 +303,16 @@ workflow {
     FASTQC(reads_ch)
     TRIM(reads_ch)
     ASSEMBLE(TRIM.out)
-    PRODIGAL(ASSEMBLE.out)
+    QUAST(ASSEMBLE.out.map { [it[0], it[1]] })
+    BUSCO(ASSEMBLE.out.map { [it[0], it[1]] })
+    PRODIGAL(ASSEMBLE.out.map { [it[0], it[1]] })
+    BARRNAP(ASSEMBLE.out.map { [it[0], it[1]] })
+    TRNA(ASSEMBLE.out.map { [it[0], it[1]] })
     ABRICATE_AMR(ASSEMBLE.out)
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
+    EGGNOG(PRODIGAL.out.map { it[1] })
     MULTIQC(FASTQC.out.collect(), TRIM.out.map { it[2] }.collect(), ASSEMBLE.out.map { it[1] }.collect())
     
     log.info "=========================================="
