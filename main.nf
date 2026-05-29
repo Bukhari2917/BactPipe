@@ -9,82 +9,133 @@ params.threads = 8
 process FASTQC {
     tag "FASTQC"
     input: tuple val(sample), path(r1), path(r2)
-    script: "fastqc ${r1} ${r2} -o ${params.outdir}/01_fastqc -t ${params.threads}"
+    script:
+    """
+    mkdir -p ${params.outdir}/01_fastqc
+    fastqc ${r1} ${r2} -o ${params.outdir}/01_fastqc -t ${params.threads}
+    """
 }
 
 process TRIM {
     tag "TRIM"
     input: tuple val(sample), path(r1), path(r2)
     output: tuple val(sample), path("trimmed_R1.fastq"), path("trimmed_R2.fastq")
-    script: "fastp -i ${r1} -I ${r2} -o ${params.outdir}/02_trimmed/trimmed_R1.fastq -O ${params.outdir}/02_trimmed/trimmed_R2.fastq -q 20 -l 50 --thread ${params.threads}"
+    script:
+    """
+    mkdir -p ${params.outdir}/02_trimmed
+    fastp -i ${r1} -I ${r2} -o ${params.outdir}/02_trimmed/trimmed_R1.fastq -O ${params.outdir}/02_trimmed/trimmed_R2.fastq -q 20 -l 50 --thread ${params.threads}
+    """
 }
 
 process ASSEMBLE {
     tag "ASSEMBLE"
     input: tuple val(sample), path(r1), path(r2)
     output: tuple val(sample), path("contigs.fasta")
-    script: "spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${params.threads} && cp spades_out/contigs.fasta ${params.outdir}/03_assembly/"
+    script:
+    """
+    mkdir -p ${params.outdir}/03_assembly
+    spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${params.threads}
+    cp spades_out/contigs.fasta ${params.outdir}/03_assembly/
+    """
 }
 
 process QUAST {
     tag "QUAST"
     input: tuple val(sample), path(assembly)
-    script: "quast.py ${assembly} -o ${params.outdir}/04_quast --threads ${params.threads}"
+    script:
+    """
+    mkdir -p ${params.outdir}/04_quast
+    quast.py ${assembly} -o ${params.outdir}/04_quast --threads ${params.threads}
+    """
 }
 
 process BUSCO {
     tag "BUSCO"
     input: tuple val(sample), path(assembly)
-    script: "busco -i ${assembly} -o ${params.outdir}/05_busco -l bacteria_odb10 -m genome --cpu ${params.threads} || true"
+    script:
+    """
+    mkdir -p ${params.outdir}/05_busco
+    busco -i ${assembly} -o ${params.outdir}/05_busco -l bacteria_odb10 -m genome --cpu ${params.threads} || true
+    """
 }
 
 process PRODIGAL {
     tag "PRODIGAL"
     input: tuple val(sample), path(assembly)
     output: tuple val(sample), path("proteins.faa")
-    script: "prodigal -i ${assembly} -a ${params.outdir}/06_genes/proteins.faa -o ${params.outdir}/06_genes/genes.gbk -p single"
+    script:
+    """
+    mkdir -p ${params.outdir}/06_genes
+    prodigal -i ${assembly} -a ${params.outdir}/06_genes/proteins.faa -o ${params.outdir}/06_genes/genes.gbk -p single
+    """
 }
 
 process BARRNAP {
     tag "BARRNAP"
     input: tuple val(sample), path(assembly)
-    script: "barrnap ${assembly} > ${params.outdir}/07_rna/rrna.gff || echo 'No rRNA' > ${params.outdir}/07_rna/rrna.gff"
+    script:
+    """
+    mkdir -p ${params.outdir}/07_rna
+    barrnap ${assembly} > ${params.outdir}/07_rna/rrna.gff || echo 'No rRNA' > ${params.outdir}/07_rna/rrna.gff
+    """
 }
 
 process TRNA {
     tag "TRNA"
     input: tuple val(sample), path(assembly)
-    script: "tRNAscan-SE -o ${params.outdir}/07_rna/trna.out ${assembly} 2>/dev/null || echo 'No tRNA' > ${params.outdir}/07_rna/trna.out"
+    script:
+    """
+    mkdir -p ${params.outdir}/07_rna
+    tRNAscan-SE -o ${params.outdir}/07_rna/trna.out ${assembly} 2>/dev/null || echo 'No tRNA' > ${params.outdir}/07_rna/trna.out
+    """
 }
 
 process ABRICATE_AMR {
     tag "ABRICATE_AMR"
     input: tuple val(sample), path(assembly)
-    script: "abricate --db card ${assembly} > ${params.outdir}/08_amr/amr_card.tsv 2>/dev/null || echo 'No AMR genes' > ${params.outdir}/08_amr/amr_card.tsv"
+    script:
+    """
+    mkdir -p ${params.outdir}/08_amr
+    abricate --db card ${assembly} > ${params.outdir}/08_amr/amr_card.tsv 2>/dev/null || echo 'No AMR genes' > ${params.outdir}/08_amr/amr_card.tsv
+    """
 }
 
 process ABRICATE_VIR {
     tag "ABRICATE_VIR"
     input: tuple val(sample), path(assembly)
-    script: "abricate --db vfdb ${assembly} > ${params.outdir}/09_virulence/virulence.tsv 2>/dev/null || echo 'No virulence genes' > ${params.outdir}/09_virulence/virulence.tsv"
+    script:
+    """
+    mkdir -p ${params.outdir}/09_virulence
+    abricate --db vfdb ${assembly} > ${params.outdir}/09_virulence/virulence.tsv 2>/dev/null || echo 'No virulence genes' > ${params.outdir}/09_virulence/virulence.tsv
+    """
 }
 
 process CRISPR {
     tag "CRISPR"
     input: tuple val(sample), path(assembly)
-    script: "echo 'CRISPR analysis completed' > ${params.outdir}/10_crispr/crispr.txt"
+    script:
+    """
+    mkdir -p ${params.outdir}/10_crispr
+    echo 'CRISPR analysis completed' > ${params.outdir}/10_crispr/crispr.txt
+    """
 }
 
 process MLST {
     tag "MLST"
     input: tuple val(sample), path(assembly)
-    script: "mlst ${assembly} > ${params.outdir}/11_mlst/mlst.txt 2>/dev/null || echo 'No MLST scheme' > ${params.outdir}/11_mlst/mlst.txt"
+    script:
+    """
+    mkdir -p ${params.outdir}/11_mlst
+    mlst ${assembly} > ${params.outdir}/11_mlst/mlst.txt 2>/dev/null || echo 'No MLST scheme' > ${params.outdir}/11_mlst/mlst.txt
+    """
 }
 
 process EGGNOG {
     tag "EGGNOG"
     input: tuple val(sample), path(proteins)
-    script: """
+    script:
+    """
+    mkdir -p ${params.outdir}/12_function
     if [ -f ${proteins} ]; then
         emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria || true
         if [ -f eggnog.emapper.annotations ]; then
@@ -99,31 +150,22 @@ process EGGNOG {
 process ANTISMASH {
     tag "ANTISMASH"
     input: tuple val(sample), path(assembly)
-    script: "antismash --cpus ${params.threads} --output-dir ${params.outdir}/13_secondary_metabolites ${assembly} || echo 'antiSMASH failed' > ${params.outdir}/13_secondary_metabolites/error.txt"
+    script:
+    """
+    mkdir -p ${params.outdir}/13_secondary_metabolites
+    antismash --cpus ${params.threads} --output-dir ${params.outdir}/13_secondary_metabolites ${assembly} || echo 'antiSMASH failed' > ${params.outdir}/13_secondary_metabolites/error.txt
+    """
 }
 
 process MULTIQC {
-    script: "multiqc ${params.outdir} --filename ${params.outdir}/multiqc_report.html --force || true"
+    script:
+    """
+    multiqc ${params.outdir} --filename ${params.outdir}/multiqc_report.html --force || true
+    """
 }
 
 workflow {
     if (!params.reads) { error "Please provide --reads parameter" }
-    
-    // Create all output directories
-    file("${params.outdir}").mkdirs()
-    file("${params.outdir}/01_fastqc").mkdirs()
-    file("${params.outdir}/02_trimmed").mkdirs()
-    file("${params.outdir}/03_assembly").mkdirs()
-    file("${params.outdir}/04_quast").mkdirs()
-    file("${params.outdir}/05_busco").mkdirs()
-    file("${params.outdir}/06_genes").mkdirs()
-    file("${params.outdir}/07_rna").mkdirs()
-    file("${params.outdir}/08_amr").mkdirs()
-    file("${params.outdir}/09_virulence").mkdirs()
-    file("${params.outdir}/10_crispr").mkdirs()
-    file("${params.outdir}/11_mlst").mkdirs()
-    file("${params.outdir}/12_function").mkdirs()
-    file("${params.outdir}/13_secondary_metabolites").mkdirs()
 
     Channel.fromFilePairs(params.reads)
         .map { sample_id, reads -> [params.sample, reads[0], reads[1]] }
