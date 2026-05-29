@@ -97,8 +97,7 @@ process EGGNOG {
     tag "EGGNOG"
     publishDir "${params.outdir}/12_function", mode: 'copy'
     input: tuple val(sample), path(proteins)
-    script:
-    """
+    script: """
     if [ -f ${proteins} ]; then
         emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria || true
         if [ -f eggnog.emapper.annotations ]; then
@@ -113,13 +112,9 @@ process EGGNOG {
 process ANTISMASH {
     tag "ANTISMASH"
     publishDir "${params.outdir}/13_secondary_metabolites", mode: 'copy'
-    input:
-    tuple val(sample), path(assembly)
-    script:
-    """
-    antismash --cpus ${params.threads} \
-              --output-dir antismash_out \
-              ${assembly} || echo 'antiSMASH failed' > antismash_out/error.txt
+    input: tuple val(sample), path(assembly)
+    script: """
+    antismash --cpus ${params.threads} --output-dir antismash_out ${assembly} || echo 'antiSMASH failed' > antismash_out/error.txt
     """
 }
 
