@@ -186,11 +186,13 @@ process ANTISMASH {
 }
 
 process MULTIQC {
-    publishDir "${params.outdir}/14_report", mode: 'copy'
+    output:
+    path "multiqc_report.html"
     script:
     """
     multiqc . --filename multiqc_report.html --force || true
     """
+    publishDir "${params.outdir}/14_report", mode: 'copy'
 }
 
 workflow {
