@@ -6,20 +6,11 @@ params.outdir = "./results"
 params.sample = "BACTERIA"
 params.threads = 8
 
-if (!params.reads) {
-    log.info "ERROR: Please provide --reads parameter"
-    exit 1
-}
-
-// ============================================================================
-// PROCESSES
-// ============================================================================
-
 process FASTQC {
+    tag "FASTQC"
     publishDir "${params.outdir}/01_fastqc", mode: 'copy'
     input:
-    path r1
-    path r2
+    tuple val(sample), path(r1), path(r2)
     script:
     """
     fastqc ${r1} ${r2} -o . -t ${params.threads}
@@ -27,26 +18,25 @@ process FASTQC {
 }
 
 process TRIM {
+    tag "TRIM"
     publishDir "${params.outdir}/02_trimmed", mode: 'copy'
     input:
-    path r1
-    path r2
+    tuple val(sample), path(r1), path(r2)
     output:
-    path "trimmed_R1.fastq"
-    path "trimmed_R2.fastq"
+    tuple val(sample), path("trimmed_R1.fastq"), path("trimmed_R2.fastq")
     script:
     """
-    fastp -i ${r1} -I ${r2} -o trimmed_R1.fastq -O trimmed_R2.fastq -q 20 -l 50
+    fastp -i ${r1} -I ${r2} -o trimmed_R1.fastq -O trimmed_R2.fastq -q 20 -l 50 --thread ${params.threads}
     """
 }
 
 process ASSEMBLE {
+    tag "ASSEMBLE"
     publishDir "${params.outdir}/03_assembly", mode: 'copy'
     input:
-    path r1
-    path r2
+    tuple val(sample), path(r1), path(r2)
     output:
-    path "contigs.fasta"
+    tuple val(sample), path("contigs.fasta")
     script:
     """
     spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${params.threads}
@@ -55,9 +45,10 @@ process ASSEMBLE {
 }
 
 process QUAST {
+    tag "QUAST"
     publishDir "${params.outdir}/04_quast", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     quast.py ${assembly} -o quast_results --threads ${params.threads}
@@ -65,9 +56,10 @@ process QUAST {
 }
 
 process BUSCO {
+    tag "BUSCO"
     publishDir "${params.outdir}/05_busco", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${params.threads} || true
@@ -75,11 +67,12 @@ process BUSCO {
 }
 
 process PRODIGAL {
+    tag "PRODIGAL"
     publishDir "${params.outdir}/06_genes", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     output:
-    path "proteins.faa"
+    tuple val(sample), path("proteins.faa")
     script:
     """
     prodigal -i ${assembly} -a proteins.faa -o genes.gbk -p single
@@ -87,9 +80,10 @@ process PRODIGAL {
 }
 
 process BARRNAP {
+    tag "BARRNAP"
     publishDir "${params.outdir}/07_rna", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     barrnap ${assembly} > rrna.gff || echo "No rRNA" > rrna.gff
@@ -97,9 +91,10 @@ process BARRNAP {
 }
 
 process TRNA {
+    tag "TRNA"
     publishDir "${params.outdir}/07_rna", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     tRNAscan-SE -o trna.out ${assembly} 2>/dev/null || echo "No tRNA" > trna.out
@@ -107,9 +102,10 @@ process TRNA {
 }
 
 process ABRICATE_AMR {
+    tag "ABRICATE_AMR"
     publishDir "${params.outdir}/08_amr", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     abricate --db card ${assembly} > amr_card.tsv 2>/dev/null || echo "No AMR genes" > amr_card.tsv
@@ -117,9 +113,10 @@ process ABRICATE_AMR {
 }
 
 process ABRICATE_VIR {
+    tag "ABRICATE_VIR"
     publishDir "${params.outdir}/09_virulence", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     abricate --db vfdb ${assembly} > virulence.tsv 2>/dev/null || echo "No virulence genes" > virulence.tsv
@@ -127,19 +124,21 @@ process ABRICATE_VIR {
 }
 
 process CRISPR {
+    tag "CRISPR"
     publishDir "${params.outdir}/10_crispr", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
-    echo "CRISPR analysis done" > crispr.txt
+    echo "CRISPR analysis completed" > crispr.txt
     """
 }
 
 process MLST {
+    tag "MLST"
     publishDir "${params.outdir}/11_mlst", mode: 'copy'
     input:
-    path assembly
+    tuple val(sample), path(assembly)
     script:
     """
     mlst ${assembly} > mlst.txt 2>/dev/null || echo "No MLST scheme" > mlst.txt
@@ -147,9 +146,10 @@ process MLST {
 }
 
 process EGGNOG {
+    tag "EGGNOG"
     publishDir "${params.outdir}/12_function", mode: 'copy'
     input:
-    path proteins
+    tuple val(sample), path(proteins)
     script:
     """
     if [ -f ${proteins} ]; then
@@ -164,6 +164,7 @@ process EGGNOG {
 }
 
 process MULTIQC {
+    tag "MULTIQC"
     publishDir "${params.outdir}/13_report", mode: 'copy'
     script:
     """
@@ -171,48 +172,47 @@ process MULTIQC {
     """
 }
 
-// ============================================================================
-// MAIN WORKFLOW
-// ============================================================================
-
 workflow {
-    // Get the first read pair correctly
+    // Check if reads parameter is provided
+    if (!params.reads) {
+        error "Please provide --reads parameter"
+    }
+    
+    // Create channel from input reads
     Channel.fromFilePairs(params.reads)
-        .first()
-        .set { read_pair }
+        .map { sample_id, reads -> [params.sample, reads[0], reads[1]] }
+        .set { reads_ch }
     
-    // Extract R1 and R2
-    r1 = read_pair[1][0]
-    r2 = read_pair[1][1]
+    // Run QC and trimming
+    FASTQC(reads_ch)
+    TRIM(reads_ch)
     
-    // Run QC
-    FASTQC(r1, r2)
+    // Assembly
+    ASSEMBLE(TRIM.out)
     
-    // Run trimming
-    TRIM(r1, r2)
+    // Create assembly channel
+    assembly_ch = ASSEMBLE.out.map { [it[0], it[1]] }
     
-    // Run assembly
-    ASSEMBLE(TRIM.out[0], TRIM.out[1])
-    
-    // Run all analyses on assembly
-    QUAST(ASSEMBLE.out)
-    BUSCO(ASSEMBLE.out)
-    PRODIGAL(ASSEMBLE.out)
-    BARRNAP(ASSEMBLE.out)
-    TRNA(ASSEMBLE.out)
+    // Run all analyses
+    QUAST(assembly_ch)
+    BUSCO(assembly_ch)
+    PRODIGAL(assembly_ch)
+    BARRNAP(assembly_ch)
+    TRNA(assembly_ch)
     ABRICATE_AMR(ASSEMBLE.out)
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(ASSEMBLE.out)
     MLST(ASSEMBLE.out)
     
-    // Run functional annotation
-    EGGNOG(PRODIGAL.out)
+    // Functional annotation
+    proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
+    EGGNOG(proteins_ch)
     
-    // Run final report
+    // Final report
     MULTIQC()
     
     log.info "=========================================="
-    log.info "BactPipe Pipeline Completed!"
+    log.info "BactPipe COMPLETE Pipeline Finished!"
     log.info "Results: ${params.outdir}"
     log.info "=========================================="
 }
