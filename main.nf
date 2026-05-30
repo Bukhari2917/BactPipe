@@ -1,3 +1,6 @@
+cd /data/sayed/bactpipe_pipeline/BactPipe
+
+cat > main.nf << 'EOF'
 #!/usr/bin/env nextflow
 
 params.reads = "data/*_R{1,2}.fastq"
@@ -5,7 +8,7 @@ params.outdir = "results"
 
 Channel
     .fromFilePairs(params.reads)
-    .ifEmpty { error "No reads found" }
+    .ifEmpty { error "No reads found in data/ folder" }
     .set { read_pairs }
 
 process FASTQC {
@@ -34,7 +37,7 @@ process TRIMMING {
         ${sample_id}_R1_trimmed.fastq ${sample_id}_R1_unpaired.fastq \
         ${sample_id}_R2_trimmed.fastq ${sample_id}_R2_unpaired.fastq \
         ILLUMINACLIP:adapters.fa:2:30:10 \
-        SLIDINGWINDOW:4:5 MINLEN:50
+        LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
     """
 }
 
@@ -52,6 +55,19 @@ process ASSEMBLY {
     """
 }
 
+process QUAST {
+    tag "QUAST"
+    publishDir "${params.outdir}/04_quast", mode: 'copy'
+    input:
+    path contigs
+    output:
+    path "quast_results/"
+    script:
+    """
+    quast.py ${contigs} -o quast_results
+    """
+}
+
 process PRODIGAL {
     tag "Prodigal"
     publishDir "${params.outdir}/05_prodigal", mode: 'copy'
@@ -62,6 +78,32 @@ process PRODIGAL {
     script:
     """
     prodigal -i ${contigs} -a proteins.faa -o genes.gff -p meta
+    """
+}
+
+process RRNA {
+    tag "rRNA"
+    publishDir "${params.outdir}/06_rrna", mode: 'copy'
+    input:
+    path contigs
+    output:
+    path "rrna_results.txt"
+    script:
+    """
+    barrnap ${contigs} > rrna_results.txt
+    """
+}
+
+process TRNA {
+    tag "tRNA"
+    publishDir "${params.outdir}/07_trna", mode: 'copy'
+    input:
+    path contigs
+    output:
+    path "trna_results.txt"
+    script:
+    """
+    tRNAscan-SE ${contigs} -o trna_results.txt
     """
 }
 
@@ -120,11 +162,15 @@ process MLST {
 workflow {
     FASTQC(read_pairs)
     TRIMMING(read_pairs)
-    TRIMMING.out.map { tuple(sample, r1, r2) }.set { trimmed }
-    ASSEMBLY(trimmed)
+    TRIMMING.out.map { tuple(sample, r1, r2) }.set { trimmed_reads }
+    ASSEMBLY(trimmed_reads)
+    QUAST(ASSEMBLY.out.contigs)
     PRODIGAL(ASSEMBLY.out.contigs)
+    RRNA(ASSEMBLY.out.contigs)
+    TRNA(ASSEMBLY.out.contigs)
     ABRICATE_AMR(ASSEMBLY.out.contigs)
     ABRICATE_VIRULENCE(ASSEMBLY.out.contigs)
     CRISPR(ASSEMBLY.out.contigs)
     MLST(ASSEMBLY.out.contigs)
 }
+EOF
