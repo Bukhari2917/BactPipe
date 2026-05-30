@@ -51,14 +51,14 @@ process QUAST {
 }
 
 // ============================================================================
-// PROCESS 5: COMPLETENESS
+// PROCESS 5: COMPLETENESS (BUSCO)
 // ============================================================================
 process BUSCO {
     tag "BUSCO"
     publishDir "${params.outdir}/05_busco", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "busco_results"
-    script: "busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${params.threads} || echo 'BUSCO not available' > busco_results.txt"
+    script: "busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${params.threads}"
 }
 
 // ============================================================================
@@ -80,7 +80,7 @@ process BARRNAP {
     publishDir "${params.outdir}/07_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "rrna.gff"
-    script: "barrnap ${assembly} > rrna.gff || echo 'No rRNA' > rrna.gff"
+    script: "barrnap ${assembly} > rrna.gff"
 }
 
 // ============================================================================
@@ -91,7 +91,7 @@ process TRNA {
     publishDir "${params.outdir}/07_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "trna.out"
-    script: "tRNAscan-SE -o trna.out ${assembly} 2>/dev/null || echo 'No tRNA' > trna.out"
+    script: "tRNAscan-SE -o trna.out ${assembly}"
 }
 
 // ============================================================================
@@ -102,7 +102,7 @@ process ABRICATE_AMR {
     publishDir "${params.outdir}/08_amr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "amr_card.tsv"
-    script: "abricate --db card ${assembly} > amr_card.tsv 2>/dev/null || echo 'No AMR genes' > amr_card.tsv"
+    script: "abricate --db card ${assembly} > amr_card.tsv"
 }
 
 // ============================================================================
@@ -113,7 +113,7 @@ process ABRICATE_VIR {
     publishDir "${params.outdir}/09_virulence", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "virulence.tsv"
-    script: "abricate --db vfdb ${assembly} > virulence.tsv 2>/dev/null || echo 'No virulence genes' > virulence.tsv"
+    script: "abricate --db vfdb ${assembly} > virulence.tsv"
 }
 
 // ============================================================================
@@ -135,18 +135,46 @@ process MLST {
     publishDir "${params.outdir}/11_mlst", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "mlst.txt"
-    script: "mlst ${assembly} > mlst.txt 2>/dev/null || echo 'No MLST scheme' > mlst.txt"
+    script: "mlst ${assembly} > mlst.txt"
 }
 
 // ============================================================================
-// PROCESS 13: SECONDARY METABOLITES
+// PROCESS 13: FUNCTIONAL ANNOTATION (KEGG/COG/GO)
+// ============================================================================
+process EGGNOG {
+    tag "EGGNOG"
+    publishDir "${params.outdir}/12_function", mode: 'copy'
+    input: tuple val(sample), path(proteins)
+    output: path "kegg_pathways.txt"
+    path "cog_categories.txt"
+    path "go_terms.txt"
+    script: """
+    emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria
+    grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
+    grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
+    grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt
+    """
+}
+
+// ============================================================================
+// PROCESS 14: SECONDARY METABOLITES
 // ============================================================================
 process ANTISMASH {
     tag "ANTISMASH"
-    publishDir "${params.outdir}/12_secondary_metabolites", mode: 'copy'
+    publishDir "${params.outdir}/13_secondary_metabolites", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "antismash_out"
-    script: "antismash --cpus ${params.threads} --output-dir antismash_out ${assembly} || echo 'antiSMASH failed' > antismash_out/error.txt"
+    script: "antismash --cpus ${params.threads} --output-dir antismash_out ${assembly}"
+}
+
+// ============================================================================
+// PROCESS 15: FINAL REPORT
+// ============================================================================
+process MULTIQC {
+    tag "MULTIQC"
+    publishDir "${params.outdir}/14_report", mode: 'copy'
+    output: path "multiqc_report.html"
+    script: "multiqc ${params.outdir} --filename multiqc_report.html --force"
 }
 
 // ============================================================================
@@ -175,8 +203,12 @@ workflow {
     MLST(ASSEMBLE.out)
     ANTISMASH(ASSEMBLE.out)
 
+    proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
+    EGGNOG(proteins_ch)
+    MULTIQC()
+
     log.info "=========================================="
-    log.info "BactPipe COMPLETE Pipeline Finished!"
+    log.info "BactPipe COMPLETE Pipeline Finished! (15 analyses)"
     log.info "Results in: ${params.outdir}"
     log.info "=========================================="
 }
