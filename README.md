@@ -1,12 +1,19 @@
-# BactPipe - Novel Bacteria Analysis Pipeline
+# BactPipe - Bacterial Genome Analysis Pipeline
 
-Complete bacterial genome analysis pipeline for novel bacteria discovery.
+Complete pipeline for bacterial genome analysis including assembly, annotation, AMR, virulence, CRISPR, and MLST.
 
 ## Quick Start
 
-1. Install Nextflow and Conda/Mamba
-
-2. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/BactPipe.git
+# Install Nextflow
+curl -s https://get.nextflow.io | bash
+
+# Clone pipeline
+git clone https://github.com/Bukhari2917/BactPipe.git
 cd BactPipe
+
+# Place your FASTQ files
+# Files must be named: sample_R1.fastq and sample_R2.fastq
+
+# Run pipeline
+nextflow run main.nf --reads 'data/*_R{1,2}.fastq' -profile conda
