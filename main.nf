@@ -1,31 +1,35 @@
 #!/usr/bin/env nextflow
+
 // ============================================
-// Novel Bacteria Analysis Pipeline
-// Complete bacterial genome analysis
-// Assembly, Annotation, AMR, Virulence, CRISPR, MLST
+// BactPipe - Complete Bacterial Analysis Pipeline
+// 11 analyses: QC, Trimming, Assembly, QUAST, 
+// Prodigal, rRNA, tRNA, AMR, Virulence, CRISPR, MLST
 // ============================================
 
-// Parameters
-params.reads = "data/*_R{1,2}.fastq.gz"
+// Define parameters
+params.reads = "data/*_R{1,2}.fastq"
 params.outdir = "results"
 
-// Input channel
+// Create channel from read pairs
 Channel
     .fromFilePairs(params.reads)
     .ifEmpty { error "No reads found matching pattern: ${params.reads}" }
     .set { read_pairs }
 
 // ============================================
-// 1. FASTQC - Quality Control
+// 1. FASTQC - Quality control
 // ============================================
 process FASTQC {
     tag "FASTQC: ${sample_id}"
-    publishDir "${params.outdir}/01_fastqc", mode: 'copy'
+    publishDir "${params.outdir}/01_fastqc", mode: 'copy', overwrite: true
+    
     input:
     tuple val(sample_id), path(reads)
+    
     output:
     path "*.html"
     path "*.zip"
+    
     script:
     """
     fastqc ${reads} -o .
@@ -33,55 +37,65 @@ process FASTQC {
 }
 
 // ============================================
-// 2. Read Trimming
+// 2. Trimming - Remove adapters and low quality
 // ============================================
 process TRIMMING {
     tag "Trimming: ${sample_id}"
-    publishDir "${params.outdir}/02_trimmed", mode: 'copy'
+    publishDir "${params.outdir}/02_trimmed", mode: 'copy', overwrite: true
+    
     input:
     tuple val(sample_id), path(reads)
+    
     output:
     tuple val(sample_id), path("*_R1_trimmed.fastq"), path("*_R2_trimmed.fastq")
+    
     script:
     """
-    trimmomatic PE ${reads[0]} ${reads[1]} \\
-        ${sample_id}_R1_trimmed.fastq ${sample_id}_R1_unpaired.fastq \\
-        ${sample_id}_R2_trimmed.fastq ${sample_id}_R2_unpaired.fastq \\
-        ILLUMINACLIP:adapters.fa:2:30:10 \\
-        SLIDINGWINDOW:4:5 MINLEN:50
+    trimmomatic PE ${reads[0]} ${reads[1]} \
+        ${sample_id}_R1_trimmed.fastq ${sample_id}_R1_unpaired.fastq \
+        ${sample_id}_R2_trimmed.fastq ${sample_id}_R2_unpaired.fastq \
+        ILLUMINACLIP:adapters.fa:2:30:10 \
+        SLIDINGWINDOW:4:5 \
+        MINLEN:50
     """
 }
 
 // ============================================
-// 3. Assembly - SPAdes
+// 3. Assembly - SPAdes genome assembly
 // ============================================
 process ASSEMBLY {
     tag "Assembly: ${sample_id}"
-    publishDir "${params.outdir}/03_assembly", mode: 'copy'
+    publishDir "${params.outdir}/03_assembly", mode: 'copy', overwrite: true
+    
     input:
     tuple val(sample_id), path(reads_R1), path(reads_R2)
+    
     output:
     path "contigs.fasta", emit: contigs
+    
     script:
     """
-    spades.py -1 ${reads_R1} -2 ${reads_R2} \\
-        -o spades_out \\
-        --isolate \\
+    spades.py -1 ${reads_R1} -2 ${reads_R2} \
+        -o spades_out \
+        --isolate \
         -t ${task.cpus}
     cp spades_out/contigs.fasta .
     """
 }
 
 // ============================================
-// 4. QUAST - Assembly Evaluation
+// 4. QUAST - Assembly evaluation
 // ============================================
 process QUAST {
     tag "QUAST"
-    publishDir "${params.outdir}/04_quast", mode: 'copy'
+    publishDir "${params.outdir}/04_quast", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "quast_results/"
+    
     script:
     """
     quast.py ${contigs} -o quast_results
@@ -89,16 +103,19 @@ process QUAST {
 }
 
 // ============================================
-// 5. Prodigal - Gene Prediction
+// 5. Prodigal - Gene prediction (using meta mode for novel bacteria)
 // ============================================
 process PRODIGAL {
     tag "Prodigal"
-    publishDir "${params.outdir}/05_prodigal", mode: 'copy'
+    publishDir "${params.outdir}/05_prodigal", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "proteins.faa", emit: proteins
     path "genes.gff"
+    
     script:
     """
     prodigal -i ${contigs} -a proteins.faa -o genes.gff -p meta
@@ -106,15 +123,18 @@ process PRODIGAL {
 }
 
 // ============================================
-// 6. rRNA Detection - Barrnap
+// 6. rRNA detection - Barrnap
 // ============================================
 process RRNA {
     tag "rRNA"
-    publishDir "${params.outdir}/06_rrna", mode: 'copy'
+    publishDir "${params.outdir}/06_rrna", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "rrna_results.txt"
+    
     script:
     """
     barrnap ${contigs} > rrna_results.txt
@@ -122,15 +142,18 @@ process RRNA {
 }
 
 // ============================================
-// 7. tRNA Detection - tRNAscan-SE
+// 7. tRNA detection - tRNAscan-SE
 // ============================================
 process TRNA {
     tag "tRNA"
-    publishDir "${params.outdir}/07_trna", mode: 'copy'
+    publishDir "${params.outdir}/07_trna", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "trna_results.txt"
+    
     script:
     """
     tRNAscan-SE ${contigs} -o trna_results.txt
@@ -138,15 +161,18 @@ process TRNA {
 }
 
 // ============================================
-// 8. AMR Detection - ABRicate
+// 8. AMR detection - Abricate (ResFinder)
 // ============================================
 process ABRICATE_AMR {
     tag "AMR"
-    publishDir "${params.outdir}/08_amr", mode: 'copy'
+    publishDir "${params.outdir}/08_amr", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "amr_results.txt"
+    
     script:
     """
     abricate ${contigs} --db resfinder > amr_results.txt
@@ -154,15 +180,18 @@ process ABRICATE_AMR {
 }
 
 // ============================================
-// 9. Virulence Detection - ABRicate
+// 9. Virulence detection - Abricate (VFDB)
 // ============================================
 process ABRICATE_VIRULENCE {
     tag "Virulence"
-    publishDir "${params.outdir}/09_virulence", mode: 'copy'
+    publishDir "${params.outdir}/09_virulence", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "virulence_results.txt"
+    
     script:
     """
     abricate ${contigs} --db vfdb > virulence_results.txt
@@ -170,15 +199,18 @@ process ABRICATE_VIRULENCE {
 }
 
 // ============================================
-// 10. CRISPR Detection - MinCED
+// 10. CRISPR detection - MinCED
 // ============================================
 process CRISPR {
     tag "CRISPR"
-    publishDir "${params.outdir}/10_crispr", mode: 'copy'
+    publishDir "${params.outdir}/10_crispr", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "crispr_results.txt"
+    
     script:
     """
     minced ${contigs} > crispr_results.txt 2>&1
@@ -186,15 +218,18 @@ process CRISPR {
 }
 
 // ============================================
-// 11. MLST Typing
+// 11. MLST - Multi-locus sequence typing
 // ============================================
 process MLST {
     tag "MLST"
-    publishDir "${params.outdir}/11_mlst", mode: 'copy'
+    publishDir "${params.outdir}/11_mlst", mode: 'copy', overwrite: true
+    
     input:
     path contigs
+    
     output:
     path "mlst_results.txt"
+    
     script:
     """
     mlst ${contigs} > mlst_results.txt
@@ -202,24 +237,41 @@ process MLST {
 }
 
 // ============================================
-// Main Workflow
+// MAIN WORKFLOW - Connects all processes
 // ============================================
 workflow {
+    // Step 1: Quality control
     FASTQC(read_pairs)
+    
+    // Step 2: Trim reads
     TRIMMING(read_pairs)
     TRIMMING.out.map { tuple(sample, r1, r2) }.set { trimmed_reads }
-    ASSEMBLY(trimmed_reads)
-    QUAST(ASSEMBLY.out.contigs)
-    PRODIGAL(ASSEMBLY.out.contigs)
-    RRNA(ASSEMBLY.out.contigs)
-    TRNA(ASSEMBLY.out.contigs)
-    ABRICATE_AMR(ASSEMBLY.out.contigs)
-    ABRICATE_VIRULENCE(ASSEMBLY.out.contigs)
-    CRISPR(ASSEMBLY.out.contigs)
-    MLST(ASSEMBLY.out.contigs)
     
+    // Step 3: Assemble genome
+    ASSEMBLY(trimmed_reads)
+    ASSEMBLY.out.contigs.set { assembly_contigs }
+    
+    // Step 4: Assembly evaluation
+    QUAST(assembly_contigs)
+    
+    // Step 5: Gene prediction
+    PRODIGAL(assembly_contigs)
+    
+    // Step 6-7: RNA detection
+    RRNA(assembly_contigs)
+    TRNA(assembly_contigs)
+    
+    // Step 8-9: AMR and Virulence
+    ABRICATE_AMR(assembly_contigs)
+    ABRICATE_VIRULENCE(assembly_contigs)
+    
+    // Step 10-11: CRISPR and MLST
+    CRISPR(assembly_contigs)
+    MLST(assembly_contigs)
+    
+    // Completion message
     log.info "=========================================="
-    log.info "Pipeline completed successfully!"
+    log.info "BactPipe Pipeline Finished! (11 analyses)"
     log.info "Results in: ${params.outdir}"
     log.info "=========================================="
 }
