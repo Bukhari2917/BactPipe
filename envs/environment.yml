@@ -1,5 +1,3 @@
-cd /data/sayed/bacteria_test/BactPipe
-
 cat > environment.yml << 'EOF'
 name: bactpipe
 channels:
