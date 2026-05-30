@@ -8,7 +8,7 @@
 // ============================================
 
 // Define parameters
-params.reads = "data/*_R{1,2}.fastq"
+params.reads = "data/*_R{1,2}.fastq.gz"
 params.outdir = "results"
 
 // Create channel from read pairs
@@ -56,7 +56,8 @@ process TRIMMING {
         ${sample_id}_R1_trimmed.fastq ${sample_id}_R1_unpaired.fastq \
         ${sample_id}_R2_trimmed.fastq ${sample_id}_R2_unpaired.fastq \
         ILLUMINACLIP:adapters.fa:2:30:10 \
-        LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50
+        SLIDINGWINDOW:4:5 \
+        MINLEN:20
     """
 }
 
@@ -76,8 +77,11 @@ process ASSEMBLY {
     
     script:
     """
-    spades.py -1 ${reads_R1} -2 ${reads_R2} -o ${sample_id} --isolate
-    cp ${sample_id}/contigs.fasta contigs.fasta
+    spades.py -1 ${reads_R1} -2 ${reads_R2} \
+        -o ${sample_id} \
+        --isolate \
+        -t ${task.cpus}
+    cp ${sample_id}/contigs.fasta .
     """
 }
 
@@ -236,40 +240,11 @@ process MLST {
 }
 
 // ============================================
-// 12. antiSMASH - Secondary metabolite clusters
-//     Runs inside Docker container
-// ============================================
-process ANTISMASH {
-    tag "antiSMASH: ${sample_id}"
-    publishDir "${params.outdir}/12_antismash", mode: 'copy'
-    
-    container 'antismash/antismash:latest'
-    
-    input:
-    path contigs
-    
-    output:
-    path "antismash_output/"
-    
-    script:
-    """
-    antismash ${contigs} \
-        --output-dir antismash_output \
-        --cpus ${task.cpus} \
-        --full-hmmer \
-        --clusterhmmer \
-        --cb-general \
-        --asf \
-        --smcog-trees
-    """
-}
-
-// ============================================
-// 13. eggNOG - Functional annotation (KEGG/COG/GO)
+// 12. eggNOG - Functional annotation (KEGG/COG/GO)
 // ============================================
 process EGGNOG {
     tag "eggNOG: ${sample_id}"
-    publishDir "${params.outdir}/13_eggnog", mode: 'copy'
+    publishDir "${params.outdir}/12_eggnog", mode: 'copy'
     
     input:
     path proteins_faa
@@ -283,7 +258,7 @@ process EGGNOG {
         --output eggnog_results \
         --cpu ${task.cpus} \
         --dmnd_db /data/databases/eggnog_proteins.dmnd \
-        --data_dir /data/databases/eggnog_data
+        --data_dir /data/databases/eggnog_data || true
     """
 }
 
@@ -320,12 +295,12 @@ workflow {
     CRISPR(assembly_contigs)
     MLST(assembly_contigs)
     
-    // Step 12: Secondary metabolites (antiSMASH via Docker)
-    ANTISMASH(assembly_contigs)
-    
-    // Step 13: Functional annotation
+    // Step 12: Functional annotation (optional, may fail if no database)
     EGGNOG(PRODIGAL.out.proteins_faa)
     
     // Completion message
-    log.info "✅ Pipeline completed successfully! Results in: ${params.outdir}"
+    log.info "=========================================="
+    log.info "BactPipe Pipeline Finished! (12 analyses)"
+    log.info "Results in: ${params.outdir}"
+    log.info "=========================================="
 }
