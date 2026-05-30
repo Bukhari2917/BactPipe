@@ -6,15 +6,6 @@ params.outdir = "./results"
 params.sample = "BACTERIA"
 params.threads = 8
 
-// Set full paths
-def QUAST = "/data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/linux-64/quast-5.3.0-py311pl5321hc84137b_1/bin/quast.py"
-def PRODIGAL = "/data/sayed/micromamba/bin/prodigal"
-def BARRNAP = "/data/sayed/micromamba/bin/barrnap"
-def TRNA = "/data/sayed/micromamba/bin/tRNAscan-SE"
-def ABRICATE = "/data/sayed/micromamba/bin/abricate"
-def MLST = "/data/sayed/micromamba/bin/mlst"
-def EMAPPER = "/data/sayed/micromamba/bin/emapper.py"
-
 process FASTQC {
     publishDir "${params.outdir}/01_fastqc", mode: 'copy'
     input: tuple val(sample), path(r1), path(r2)
@@ -40,42 +31,42 @@ process QUAST {
     publishDir "${params.outdir}/04_quast", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "quast_results"
-    script: "${QUAST} ${assembly} -o quast_results --threads ${params.threads}"
+    script: "/data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/linux-64/quast-5.3.0-py311pl5321hc84137b_1/bin/quast.py ${assembly} -o quast_results --threads ${params.threads}"
 }
 
 process PRODIGAL {
     publishDir "${params.outdir}/05_genes", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: tuple val(sample), path("proteins.faa")
-    script: "${PRODIGAL} -i ${assembly} -a proteins.faa -o genes.gbk -p single"
+    script: "prodigal -i ${assembly} -a proteins.faa -o genes.gbk -p single"
 }
 
 process BARRNAP {
     publishDir "${params.outdir}/06_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "rrna.gff"
-    script: "${BARRNAP} ${assembly} > rrna.gff || echo 'No rRNA' > rrna.gff"
+    script: "barrnap ${assembly} > rrna.gff || echo 'No rRNA' > rrna.gff"
 }
 
 process TRNA {
     publishDir "${params.outdir}/06_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "trna.out"
-    script: "${TRNA} -o trna.out ${assembly} 2>/dev/null || echo 'No tRNA found' > trna.out"
+    script: "tRNAscan-SE -o trna.out ${assembly} 2>/dev/null || echo 'No tRNA found' > trna.out"
 }
 
 process ABRICATE_AMR {
     publishDir "${params.outdir}/07_amr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "amr_card.tsv"
-    script: "${ABRICATE} --db card ${assembly} > amr_card.tsv 2>/dev/null || echo 'No AMR genes' > amr_card.tsv"
+    script: "abricate --db card ${assembly} > amr_card.tsv 2>/dev/null || echo 'No AMR genes' > amr_card.tsv"
 }
 
 process ABRICATE_VIR {
     publishDir "${params.outdir}/08_virulence", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "virulence.tsv"
-    script: "${ABRICATE} --db vfdb ${assembly} > virulence.tsv 2>/dev/null || echo 'No virulence genes' > virulence.tsv"
+    script: "abricate --db vfdb ${assembly} > virulence.tsv 2>/dev/null || echo 'No virulence genes' > virulence.tsv"
 }
 
 process CRISPR {
@@ -89,7 +80,7 @@ process MLST {
     publishDir "${params.outdir}/10_mlst", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "mlst.txt"
-    script: "${MLST} ${assembly} > mlst.txt 2>/dev/null || echo 'MLST not available' > mlst.txt"
+    script: "mlst ${assembly} > mlst.txt 2>/dev/null || echo 'MLST not available' > mlst.txt"
 }
 
 process EGGNOG {
@@ -99,7 +90,7 @@ process EGGNOG {
     path "cog_categories.txt"
     path "go_terms.txt"
     script: """
-    ${EMAPPER} -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria 2>/dev/null || echo 'eggNOG failed' > eggnog_error.txt
+    emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria 2>/dev/null || echo 'eggNOG failed' > eggnog_error.txt
     if [ -f eggnog.emapper.annotations ]; then
         grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
         grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
