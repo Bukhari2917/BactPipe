@@ -1,11 +1,12 @@
-# BactPipe
+# BactPipe - Novel Bacteria Analysis Pipeline
 
-[![Nextflow](https://img.shields.io/badge/nextflow-24.04.2-brightgreen.svg)](https://www.nextflow.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-**BactPipe** is a complete bacterial genome analysis pipeline.
+Complete bacterial genome analysis pipeline for novel bacteria discovery.
 
 ## Quick Start
 
+1. Install Nextflow and Conda/Mamba
+
+2. Clone the repository:
 ```bash
-nextflow run Bukhari2917/BactPipe --reads 'data/*_R{1,2}.fastq' -profile conda
+git clone https://github.com/yourusername/BactPipe.git
+cd BactPipe
