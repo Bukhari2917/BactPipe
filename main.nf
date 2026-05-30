@@ -2,7 +2,7 @@
 
 // ============================================
 // BactPipe - Complete Bacterial Analysis Pipeline
-// 11 analyses: QC, Trimming, Assembly, QUAST, 
+// 10 analyses: QC, Trimming, Assembly, QUAST, 
 // Prodigal, rRNA, tRNA, AMR, Virulence, CRISPR, MLST
 // ============================================
 
@@ -55,8 +55,7 @@ process TRIMMING {
         ${sample_id}_R1_trimmed.fastq ${sample_id}_R1_unpaired.fastq \
         ${sample_id}_R2_trimmed.fastq ${sample_id}_R2_unpaired.fastq \
         ILLUMINACLIP:adapters.fa:2:30:10 \
-        SLIDINGWINDOW:4:5 \
-        MINLEN:50
+        SLIDINGWINDOW:4:5 MINLEN:50
     """
 }
 
