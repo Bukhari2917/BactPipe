@@ -1,18 +1,15 @@
-cat > environment.yml << 'EOF'
 name: bactpipe
 channels:
   - bioconda
   - conda-forge
 dependencies:
-  - nextflow=23.10.0
-  - fastqc=0.12.1
-  - trimmomatic=0.39
-  - spades=3.15.5
-  - quast=5.2.0
-  - prodigal=2.6.3
-  - barrnap=0.9
-  - trnascan-se=2.0.12
-  - abricate=1.0.1
-  - mlst=2.23.0
-  - minced=0.4.2
-EOF
+  - fastqc
+  - trimmomatic
+  - spades
+  - quast
+  - prodigal
+  - barrnap
+  - trnascan-se
+  - abricate
+  - mlst
+  - minced
