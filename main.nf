@@ -6,12 +6,6 @@ params.outdir = "./results"
 params.sample = "BACTERIA"
 params.threads = 8
 
-// Tool paths
-def ABRICATE = "/data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/abricate-1.4.0-h05cac1d_0/bin/abricate"
-def MLST = "/data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/mlst-2.33.1-hdfd78af_0/bin/mlst"
-def ANTISMASH = "/data/sayed/micromamba/bin/antismash"
-def EMAPPER = "/data/sayed/micromamba/bin/emapper.py"
-
 // ============================================================================
 // PROCESS 1: QUALITY CONTROL
 // ============================================================================
@@ -83,23 +77,27 @@ process TRNA {
 }
 
 // ============================================================================
-// PROCESS 8: AMR DETECTION (using abricate)
+// PROCESS 8: AMR DETECTION
 // ============================================================================
 process ABRICATE_AMR {
     publishDir "${params.outdir}/07_amr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "amr_card.tsv"
-    script: "${ABRICATE} --db card ${assembly} > amr_card.tsv"
+    script: """
+    /data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/abricate-1.4.0-h05cac1d_0/bin/abricate --db card ${assembly} > amr_card.tsv
+    """
 }
 
 // ============================================================================
-// PROCESS 9: VIRULENCE DETECTION (using abricate)
+// PROCESS 9: VIRULENCE DETECTION
 // ============================================================================
 process ABRICATE_VIR {
     publishDir "${params.outdir}/08_virulence", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "virulence.tsv"
-    script: "${ABRICATE} --db vfdb ${assembly} > virulence.tsv"
+    script: """
+    /data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/abricate-1.4.0-h05cac1d_0/bin/abricate --db vfdb ${assembly} > virulence.tsv
+    """
 }
 
 // ============================================================================
@@ -113,27 +111,31 @@ process CRISPR {
 }
 
 // ============================================================================
-// PROCESS 11: MLST TYPING (using mlst)
+// PROCESS 11: MLST TYPING
 // ============================================================================
 process MLST {
     publishDir "${params.outdir}/10_mlst", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "mlst.txt"
-    script: "${MLST} ${assembly} > mlst.txt"
+    script: """
+    /data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/mlst-2.33.1-hdfd78af_0/bin/mlst ${assembly} > mlst.txt
+    """
 }
 
 // ============================================================================
-// PROCESS 12: SECONDARY METABOLITES (using antismash)
+// PROCESS 12: SECONDARY METABOLITES
 // ============================================================================
 process ANTISMASH {
     publishDir "${params.outdir}/11_secondary_metabolites", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "antismash_out"
-    script: "${ANTISMASH} --cpus ${params.threads} --output-dir antismash_out ${assembly}"
+    script: """
+    /data/sayed/micromamba/bin/antismash --cpus ${params.threads} --output-dir antismash_out ${assembly}
+    """
 }
 
 // ============================================================================
-// PROCESS 13: FUNCTIONAL ANNOTATION (using eggnog-mapper)
+// PROCESS 13: FUNCTIONAL ANNOTATION
 // ============================================================================
 process EGGNOG {
     publishDir "${params.outdir}/12_function", mode: 'copy'
@@ -142,7 +144,7 @@ process EGGNOG {
     path "cog_categories.txt"
     path "go_terms.txt"
     script: """
-    ${EMAPPER} -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria
+    /data/sayed/micromamba/bin/emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria
     if [ -f eggnog.emapper.annotations ]; then
         grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
         grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
