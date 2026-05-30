@@ -51,91 +51,91 @@ process QUAST {
 }
 
 // ============================================================================
-// PROCESS 5: COMPLETENESS (BUSCO)
-// ============================================================================
-process BUSCO {
-    tag "BUSCO"
-    publishDir "${params.outdir}/05_busco", mode: 'copy'
-    input: tuple val(sample), path(assembly)
-    output: path "busco_results"
-    script: "busco -i ${assembly} -o busco_results -l bacteria_odb10 -m genome --cpu ${params.threads}"
-}
-
-// ============================================================================
-// PROCESS 6: GENE PREDICTION
+// PROCESS 5: GENE PREDICTION
 // ============================================================================
 process PRODIGAL {
     tag "PRODIGAL"
-    publishDir "${params.outdir}/06_genes", mode: 'copy'
+    publishDir "${params.outdir}/05_genes", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: tuple val(sample), path("proteins.faa")
     script: "prodigal -i ${assembly} -a proteins.faa -o genes.gbk -p single"
 }
 
 // ============================================================================
-// PROCESS 7: rRNA DETECTION
+// PROCESS 6: rRNA DETECTION
 // ============================================================================
 process BARRNAP {
     tag "BARRNAP"
-    publishDir "${params.outdir}/07_rna", mode: 'copy'
+    publishDir "${params.outdir}/06_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "rrna.gff"
     script: "barrnap ${assembly} > rrna.gff"
 }
 
 // ============================================================================
-// PROCESS 8: tRNA DETECTION
+// PROCESS 7: tRNA DETECTION
 // ============================================================================
 process TRNA {
     tag "TRNA"
-    publishDir "${params.outdir}/07_rna", mode: 'copy'
+    publishDir "${params.outdir}/06_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "trna.out"
     script: "tRNAscan-SE -o trna.out ${assembly}"
 }
 
 // ============================================================================
-// PROCESS 9: AMR DETECTION
+// PROCESS 8: AMR DETECTION
 // ============================================================================
 process ABRICATE_AMR {
     tag "ABRICATE_AMR"
-    publishDir "${params.outdir}/08_amr", mode: 'copy'
+    publishDir "${params.outdir}/07_amr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "amr_card.tsv"
     script: "abricate --db card ${assembly} > amr_card.tsv"
 }
 
 // ============================================================================
-// PROCESS 10: VIRULENCE DETECTION
+// PROCESS 9: VIRULENCE DETECTION
 // ============================================================================
 process ABRICATE_VIR {
     tag "ABRICATE_VIR"
-    publishDir "${params.outdir}/09_virulence", mode: 'copy'
+    publishDir "${params.outdir}/08_virulence", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "virulence.tsv"
     script: "abricate --db vfdb ${assembly} > virulence.tsv"
 }
 
 // ============================================================================
-// PROCESS 11: CRISPR DETECTION
+// PROCESS 10: CRISPR DETECTION
 // ============================================================================
 process CRISPR {
     tag "CRISPR"
-    publishDir "${params.outdir}/10_crispr", mode: 'copy'
+    publishDir "${params.outdir}/09_crispr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "crispr.txt"
     script: "echo 'CRISPR analysis completed' > crispr.txt"
 }
 
 // ============================================================================
-// PROCESS 12: MLST TYPING
+// PROCESS 11: MLST TYPING
 // ============================================================================
 process MLST {
     tag "MLST"
-    publishDir "${params.outdir}/11_mlst", mode: 'copy'
+    publishDir "${params.outdir}/10_mlst", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "mlst.txt"
     script: "mlst ${assembly} > mlst.txt"
+}
+
+// ============================================================================
+// PROCESS 12: SECONDARY METABOLITES
+// ============================================================================
+process ANTISMASH {
+    tag "ANTISMASH"
+    publishDir "${params.outdir}/11_secondary_metabolites", mode: 'copy'
+    input: tuple val(sample), path(assembly)
+    output: path "antismash_out"
+    script: "antismash --cpus ${params.threads} --output-dir antismash_out ${assembly}"
 }
 
 // ============================================================================
@@ -157,22 +157,11 @@ process EGGNOG {
 }
 
 // ============================================================================
-// PROCESS 14: SECONDARY METABOLITES
-// ============================================================================
-process ANTISMASH {
-    tag "ANTISMASH"
-    publishDir "${params.outdir}/13_secondary_metabolites", mode: 'copy'
-    input: tuple val(sample), path(assembly)
-    output: path "antismash_out"
-    script: "antismash --cpus ${params.threads} --output-dir antismash_out ${assembly}"
-}
-
-// ============================================================================
-// PROCESS 15: FINAL REPORT
+// PROCESS 14: FINAL REPORT
 // ============================================================================
 process MULTIQC {
     tag "MULTIQC"
-    publishDir "${params.outdir}/14_report", mode: 'copy'
+    publishDir "${params.outdir}/13_report", mode: 'copy'
     output: path "multiqc_report.html"
     script: "multiqc ${params.outdir} --filename multiqc_report.html --force"
 }
@@ -193,7 +182,6 @@ workflow {
     assembly_ch = ASSEMBLE.out.map { [it[0], it[1]] }
 
     QUAST(assembly_ch)
-    BUSCO(assembly_ch)
     PRODIGAL(assembly_ch)
     BARRNAP(assembly_ch)
     TRNA(assembly_ch)
@@ -208,7 +196,7 @@ workflow {
     MULTIQC()
 
     log.info "=========================================="
-    log.info "BactPipe COMPLETE Pipeline Finished! (15 analyses)"
+    log.info "BactPipe Pipeline Finished! (14 analyses)"
     log.info "Results in: ${params.outdir}"
     log.info "=========================================="
 }
