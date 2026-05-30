@@ -1,3 +1,6 @@
+cd /data/sayed/bactpipe_pipeline/BactPipe
+
+cat > environment.yml << 'EOF'
 name: bactpipe
 channels:
   - bioconda
@@ -13,3 +16,4 @@ dependencies:
   - abricate
   - mlst
   - minced
+EOF
