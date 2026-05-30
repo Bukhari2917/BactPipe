@@ -157,16 +157,6 @@ process EGGNOG {
 }
 
 // ============================================================================
-// PROCESS 14: FINAL REPORT
-// ============================================================================
-process MULTIQC {
-    tag "MULTIQC"
-    publishDir "${params.outdir}/13_report", mode: 'copy'
-    output: path "multiqc_report.html"
-    script: "multiqc ${params.outdir} --filename multiqc_report.html --force"
-}
-
-// ============================================================================
 // MAIN WORKFLOW
 // ============================================================================
 workflow {
@@ -193,10 +183,9 @@ workflow {
 
     proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
     EGGNOG(proteins_ch)
-    MULTIQC()
 
     log.info "=========================================="
-    log.info "BactPipe Pipeline Finished! (14 analyses)"
+    log.info "BactPipe Pipeline Finished! (13 analyses)"
     log.info "Results in: ${params.outdir}"
     log.info "=========================================="
 }
