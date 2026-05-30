@@ -6,11 +6,16 @@ params.outdir = "./results"
 params.sample = "BACTERIA"
 params.threads = 8
 
+// Tool paths
+def ABRICATE = "/data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/abricate-1.4.0-h05cac1d_0/bin/abricate"
+def MLST = "/data/sayed/micromamba/pkgs/https/conda.anaconda.org/bioconda/noarch/mlst-2.33.1-hdfd78af_0/bin/mlst"
+def ANTISMASH = "/data/sayed/micromamba/bin/antismash"
+def EMAPPER = "/data/sayed/micromamba/bin/emapper.py"
+
 // ============================================================================
 // PROCESS 1: QUALITY CONTROL
 // ============================================================================
 process FASTQC {
-    tag "FASTQC"
     publishDir "${params.outdir}/01_fastqc", mode: 'copy'
     input: tuple val(sample), path(r1), path(r2)
     output: path "fastqc_results"
@@ -21,7 +26,6 @@ process FASTQC {
 // PROCESS 2: TRIMMING
 // ============================================================================
 process TRIM {
-    tag "TRIM"
     publishDir "${params.outdir}/02_trimmed", mode: 'copy'
     input: tuple val(sample), path(r1), path(r2)
     output: tuple val(sample), path("trimmed_R1.fastq"), path("trimmed_R2.fastq")
@@ -32,7 +36,6 @@ process TRIM {
 // PROCESS 3: ASSEMBLY
 // ============================================================================
 process ASSEMBLE {
-    tag "ASSEMBLE"
     publishDir "${params.outdir}/03_assembly", mode: 'copy'
     input: tuple val(sample), path(r1), path(r2)
     output: tuple val(sample), path("contigs.fasta")
@@ -43,7 +46,6 @@ process ASSEMBLE {
 // PROCESS 4: ASSEMBLY STATISTICS
 // ============================================================================
 process QUAST {
-    tag "QUAST"
     publishDir "${params.outdir}/04_quast", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "quast_results"
@@ -54,7 +56,6 @@ process QUAST {
 // PROCESS 5: GENE PREDICTION
 // ============================================================================
 process PRODIGAL {
-    tag "PRODIGAL"
     publishDir "${params.outdir}/05_genes", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: tuple val(sample), path("proteins.faa")
@@ -65,7 +66,6 @@ process PRODIGAL {
 // PROCESS 6: rRNA DETECTION
 // ============================================================================
 process BARRNAP {
-    tag "BARRNAP"
     publishDir "${params.outdir}/06_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "rrna.gff"
@@ -76,7 +76,6 @@ process BARRNAP {
 // PROCESS 7: tRNA DETECTION
 // ============================================================================
 process TRNA {
-    tag "TRNA"
     publishDir "${params.outdir}/06_rna", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "trna.out"
@@ -84,32 +83,29 @@ process TRNA {
 }
 
 // ============================================================================
-// PROCESS 8: AMR DETECTION
+// PROCESS 8: AMR DETECTION (using abricate)
 // ============================================================================
 process ABRICATE_AMR {
-    tag "ABRICATE_AMR"
     publishDir "${params.outdir}/07_amr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "amr_card.tsv"
-    script: "abricate --db card ${assembly} > amr_card.tsv"
+    script: "${ABRICATE} --db card ${assembly} > amr_card.tsv"
 }
 
 // ============================================================================
-// PROCESS 9: VIRULENCE DETECTION
+// PROCESS 9: VIRULENCE DETECTION (using abricate)
 // ============================================================================
 process ABRICATE_VIR {
-    tag "ABRICATE_VIR"
     publishDir "${params.outdir}/08_virulence", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "virulence.tsv"
-    script: "abricate --db vfdb ${assembly} > virulence.tsv"
+    script: "${ABRICATE} --db vfdb ${assembly} > virulence.tsv"
 }
 
 // ============================================================================
 // PROCESS 10: CRISPR DETECTION
 // ============================================================================
 process CRISPR {
-    tag "CRISPR"
     publishDir "${params.outdir}/09_crispr", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "crispr.txt"
@@ -117,42 +113,45 @@ process CRISPR {
 }
 
 // ============================================================================
-// PROCESS 11: MLST TYPING
+// PROCESS 11: MLST TYPING (using mlst)
 // ============================================================================
 process MLST {
-    tag "MLST"
     publishDir "${params.outdir}/10_mlst", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "mlst.txt"
-    script: "mlst ${assembly} > mlst.txt"
+    script: "${MLST} ${assembly} > mlst.txt"
 }
 
 // ============================================================================
-// PROCESS 12: SECONDARY METABOLITES
+// PROCESS 12: SECONDARY METABOLITES (using antismash)
 // ============================================================================
 process ANTISMASH {
-    tag "ANTISMASH"
     publishDir "${params.outdir}/11_secondary_metabolites", mode: 'copy'
     input: tuple val(sample), path(assembly)
     output: path "antismash_out"
-    script: "antismash --cpus ${params.threads} --output-dir antismash_out ${assembly}"
+    script: "${ANTISMASH} --cpus ${params.threads} --output-dir antismash_out ${assembly}"
 }
 
 // ============================================================================
-// PROCESS 13: FUNCTIONAL ANNOTATION (KEGG/COG/GO)
+// PROCESS 13: FUNCTIONAL ANNOTATION (using eggnog-mapper)
 // ============================================================================
 process EGGNOG {
-    tag "EGGNOG"
     publishDir "${params.outdir}/12_function", mode: 'copy'
     input: tuple val(sample), path(proteins)
     output: path "kegg_pathways.txt"
     path "cog_categories.txt"
     path "go_terms.txt"
     script: """
-    emapper.py -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria
-    grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
-    grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
-    grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt
+    ${EMAPPER} -i ${proteins} --output eggnog --cpu ${params.threads} --tax_scope Bacteria
+    if [ -f eggnog.emapper.annotations ]; then
+        grep -v '^#' eggnog.emapper.annotations | cut -f12 | sort | uniq -c | sort -rn > kegg_pathways.txt
+        grep -v '^#' eggnog.emapper.annotations | cut -f7 | sort | uniq -c | sort -rn > cog_categories.txt
+        grep -v '^#' eggnog.emapper.annotations | cut -f9 | tr ',' '\n' | sort | uniq -c | sort -rn > go_terms.txt
+    else
+        echo "eggNOG analysis failed" > kegg_pathways.txt
+        echo "eggNOG analysis failed" > cog_categories.txt
+        echo "eggNOG analysis failed" > go_terms.txt
+    fi
     """
 }
 
