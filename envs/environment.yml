@@ -2,7 +2,6 @@ name: bactpipe
 channels:
   - bioconda
   - conda-forge
-  - defaults
 dependencies:
   - nextflow=23.10.0
   - fastqc=0.12.1
@@ -15,5 +14,3 @@ dependencies:
   - abricate=1.0.1
   - mlst=2.23.0
   - minced=0.4.2
-  - antismash=7.1.0
-  - eggnog-mapper=2.1.10
