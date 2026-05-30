@@ -83,15 +83,8 @@ process MLST {
     script: "mlst ${assembly} > mlst.txt 2>/dev/null || echo 'MLST not available' > mlst.txt"
 }
 
-process ANTISMASH {
-    publishDir "${params.outdir}/11_secondary_metabolites", mode: 'copy'
-    input: tuple val(sample), path(assembly)
-    output: path "antismash_out"
-    script: "antismash --cpus ${params.threads} --output-dir antismash_out ${assembly} 2>/dev/null || echo 'antiSMASH failed' > antismash_error.txt"
-}
-
 process EGGNOG {
-    publishDir "${params.outdir}/12_function", mode: 'copy'
+    publishDir "${params.outdir}/11_function", mode: 'copy'
     input: tuple val(sample), path(proteins)
     output: path "kegg_pathways.txt"
     path "cog_categories.txt"
@@ -130,13 +123,12 @@ workflow {
     ABRICATE_VIR(ASSEMBLE.out)
     CRISPR(assembly_ch)
     MLST(ASSEMBLE.out)
-    ANTISMASH(ASSEMBLE.out)
 
     proteins_ch = PRODIGAL.out.map { [it[0], it[1]] }
     EGGNOG(proteins_ch)
 
     log.info "=========================================="
-    log.info "BactPipe Pipeline Finished!"
+    log.info "BactPipe Pipeline Finished! (12 analyses)"
     log.info "Results in: ${params.outdir}"
     log.info "=========================================="
 }
