@@ -1,20 +1,19 @@
+cd ~/bactpipe_work/BactPipe
+
+cat > run.sh << 'EOF'
 #!/bin/bash
-# BactPipe - Universal Bacterial Genome Analysis Pipeline
+# BactPipe - Bacterial Analysis Pipeline
 # Usage: bash run.sh
 
 SAMPLE="sample"
 THREADS=8
 
-# Paths (Data and Results folders are ONE LEVEL UP from pipeline)
 DATA_DIR="../Data"
-RESULTS_DIR="../Results"
+RESULTS_DIR="../out_results"
 
 echo "========================================="
 echo "BactPipe - Bacterial Analysis Pipeline"
 echo "========================================="
-
-# Create directories if they don't exist
-mkdir -p $DATA_DIR $RESULTS_DIR
 
 # Check if FASTQ files exist
 if [ ! -f "$DATA_DIR/${SAMPLE}_R1.fastq" ]; then
@@ -25,15 +24,12 @@ if [ ! -f "$DATA_DIR/${SAMPLE}_R1.fastq" ]; then
     echo "  ├── Data/          ← Place your FASTQ files here"
     echo "  │   ├── sample_R1.fastq"
     echo "  │   └── sample_R2.fastq"
-    echo "  ├── Results/       ← Results will appear here"
+    echo "  ├── out_results/   ← Results will appear here"
     echo "  └── BactPipe/      ← Pipeline code (you are here)"
     echo ""
-    echo "Current files in $DATA_DIR/:"
-    ls -la $DATA_DIR/ 2>/dev/null || echo "  (Directory empty or doesn't exist)"
     exit 1
 fi
 
-# Create results subdirectories
 mkdir -p $RESULTS_DIR/{01_fastqc,02_trimmed,03_assembly,04_quast,05_prokka,06_amr,07_virulence,08_mlst}
 
 echo "[1/8] Quality Control..."
@@ -55,7 +51,8 @@ echo "[4/8] Assembly Quality..."
 quast.py $RESULTS_DIR/03_assembly/contigs.fasta -o $RESULTS_DIR/04_quast -t $THREADS
 
 echo "[5/8] Genome Annotation..."
-prokka $RESULTS_DIR/03_assembly/contigs.fasta --outdir $RESULTS_DIR/05_prokka \
+~/prokka-1.14.6/bin/prokka $RESULTS_DIR/03_assembly/contigs.fasta \
+       --outdir $RESULTS_DIR/05_prokka \
        --prefix $SAMPLE --kingdom Bacteria --cpus $THREADS --force
 
 echo "[6/8] AMR Detection..."
@@ -71,9 +68,10 @@ echo "========================================="
 echo "PIPELINE COMPLETE!"
 echo "========================================="
 echo "Results saved in: $RESULTS_DIR/"
-echo ""
-echo "Key results:"
-echo "  - Assembly:    $RESULTS_DIR/03_assembly/contigs.fasta"
-echo "  - Annotation:  $RESULTS_DIR/05_prokka/sample.gbk"
-echo "  - AMR genes:   $RESULTS_DIR/06_amr/amr_card.tsv"
-echo "  - MLST:        $RESULTS_DIR/08_mlst/mlst.txt"
+echo "  - Assembly: $RESULTS_DIR/03_assembly/contigs.fasta"
+echo "  - Annotation: $RESULTS_DIR/05_prokka/sample.gbk"
+echo "  - AMR genes: $RESULTS_DIR/06_amr/amr_card.tsv"
+echo "  - MLST: $RESULTS_DIR/08_mlst/mlst.txt"
+EOF
+
+chmod +x run.sh
