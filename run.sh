@@ -1,6 +1,3 @@
-cd ~/bactpipe_work/BactPipe
-
-cat > run.sh << 'EOF'
 #!/bin/bash
 # BactPipe - Bacterial Analysis Pipeline
 # Usage: bash run.sh
@@ -30,7 +27,7 @@ if [ ! -f "$DATA_DIR/${SAMPLE}_R1.fastq" ]; then
     exit 1
 fi
 
-mkdir -p $RESULTS_DIR/{01_fastqc,02_trimmed,03_assembly,04_quast,05_prokka,06_amr,07_virulence,08_mlst}
+mkdir -p $RESULTS_DIR/{01_fastqc,02_trimmed,03_assembly,04_quast,05_prokka,06_amr,07_virulence,08_mlst,09_visualizations}
 
 echo "[1/8] Quality Control..."
 fastqc $DATA_DIR/${SAMPLE}_R1.fastq $DATA_DIR/${SAMPLE}_R2.fastq -o $RESULTS_DIR/01_fastqc -t $THREADS
@@ -68,10 +65,41 @@ echo "========================================="
 echo "PIPELINE COMPLETE!"
 echo "========================================="
 echo "Results saved in: $RESULTS_DIR/"
-echo "  - Assembly: $RESULTS_DIR/03_assembly/contigs.fasta"
-echo "  - Annotation: $RESULTS_DIR/05_prokka/sample.gbk"
-echo "  - AMR genes: $RESULTS_DIR/06_amr/amr_card.tsv"
-echo "  - MLST: $RESULTS_DIR/08_mlst/mlst.txt"
-EOF
+echo ""
 
-chmod +x run.sh
+# Fix GBK for circular genome
+echo "========================================="
+echo "FIXING GBK FOR CIRCULAR GENOME"
+echo "========================================="
+
+CLEAN_DIR="$RESULTS_DIR/05_prokka_clean"
+FINAL_GBK="$RESULTS_DIR/05_prokka/sample_fixed.gbk"
+
+mkdir -p $CLEAN_DIR
+
+echo "[1/3] Creating clean contig names..."
+sed 's/ .*//; s/_cov_[0-9.]*//g; s/_length_[0-9]*//g' $RESULTS_DIR/03_assembly/contigs.fasta > $CLEAN_DIR/contigs_clean.fasta
+
+echo "[2/3] Re-annotating with Prokka..."
+~/prokka-1.14.6/bin/prokka $CLEAN_DIR/contigs_clean.fasta \
+       --outdir $CLEAN_DIR \
+       --prefix sample \
+       --kingdom Bacteria \
+       --cpus $THREADS \
+       --force \
+       --locustag SAMPLE
+
+echo "[3/3] Copying GBK file..."
+cp $CLEAN_DIR/sample.gbk $FINAL_GBK
+
+echo ""
+echo "========================================="
+echo "CIRCULAR GENOME READY!"
+echo "========================================="
+echo "Fixed GBK file: $FINAL_GBK"
+echo ""
+echo "Download to your computer:"
+echo "  scp sayed@j3-053-010:$FINAL_GBK ./"
+echo ""
+echo "Then upload to: https://proksee.ca/"
+echo "========================================="
