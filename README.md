@@ -1,6 +1,9 @@
+cd ~/bactpipe_work/BactPipe
+
+cat > README.md << 'EOF'
 # BactPipe - Bacterial Genome Analysis Pipeline
 
-**One command. Complete analysis. Circular genome visualization.**
+**One command. Complete analysis.**
 
 ## Quick Start
 
@@ -12,10 +15,8 @@ mkdir -p ~/bactpipe_work/Data ~/bactpipe_work/out_results
 cd ~/bactpipe_work
 git clone https://github.com/Bukhari2917/BactPipe.git
 
-# 3. Place your FASTQ files (rename to sample_R1.fastq, sample_R2.fastq)
-cp /path/to/your_R1.fastq Data/sample_R1.fastq
-cp /path/to/your_R2.fastq Data/sample_R2.fastq
+# 3. Place FASTQ files in Data/ (rename to sample_R1.fastq, sample_R2.fastq)
 
-# 4. Run pipeline (ONE COMMAND)
+# 4. Run pipeline
 cd BactPipe
 bash run.sh
