@@ -14,20 +14,12 @@ BactPipe is an automated pipeline that analyzes bacterial DNA sequencing data. I
 
 ## PART 1: INSTALLATION (One Time Only)
 
-### Step 1: Install Miniconda
+### Step 1: Install Micromamba
 
 ```bash
-# Download Miniconda
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+# Download and install Micromamba
+curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
 
-# Install it
-bash Miniconda3-latest-Linux-x86_64.sh
-
-# Follow prompts:
-# - Press Enter to read license
-# - Type 'yes' to accept
-# - Press Enter for default location
-# - Type 'yes' to initialize
-
-# Reload terminal
+# Run Micromamba shell setup
+./bin/micromamba shell init -s bash -p ~/micromamba
 source ~/.bashrc
