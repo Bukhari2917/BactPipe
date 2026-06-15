@@ -12,7 +12,6 @@ process ASSEMBLE {
     """
     spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${task.cpus} --rename
     
-    awk '/^>/ {print ">contig_" ++i; next} {print}' spades_out/contigs.fasta > spades_out/contigs.fixed.fasta
-    cp spades_out/contigs.fixed.fasta contigs.fasta
+    awk '/^>/ {print ">contig_" ++i; next} {print}' spades_out/contigs.fasta > contigs.fasta
     """
 }
