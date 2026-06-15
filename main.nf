@@ -1,4 +1,3 @@
-cat > main.nf << 'EOF'
 #!/usr/bin/env nextflow
 //============================================================
 // BactPipe - Universal Bacterial Genome Analysis Pipeline
@@ -100,7 +99,7 @@ process TRIMMING {
     """
 }
 
-// Step 3: Assembly
+// Step 3: Assembly - FIXED with --rename and contig renaming
 process ASSEMBLY {
     tag "Assembly: ${sample_id}"
     publishDir "${params.outdir}/03_assembly", mode: 'copy'
@@ -119,9 +118,14 @@ process ASSEMBLY {
               -o spades_output \\
               --isolate \\
               -t ${params.threads} \\
-              -m ${params.memory.replace('GB','')}
+              -m ${params.memory.replace('GB','')} \\
+              --rename
     
     cp spades_output/contigs.fasta contigs.fasta
+    
+    # Fix contig names for Prokka
+    awk '/^>/ {print ">contig_" ++i; next} {print}' contigs.fasta > contigs.fixed.fasta
+    mv contigs.fixed.fasta contigs.fasta
     """
 }
 
@@ -142,7 +146,7 @@ process QUAST {
     """
 }
 
-// Step 5: Prokka
+// Step 5: Prokka - FIXED with --centre X
 process PROKKA {
     tag "Annotation: ${sample_id}"
     publishDir "${params.outdir}/05_annotation", mode: 'copy'
@@ -161,6 +165,7 @@ process PROKKA {
            --outdir prokka_out \\
            --prefix sample \\
            --kingdom Bacteria \\
+           --centre X \\
            --cpus ${params.threads} \\
            --force
     
@@ -236,4 +241,3 @@ process MULTIQC {
     multiqc . -o multiqc_report
     """
 }
-EOF
