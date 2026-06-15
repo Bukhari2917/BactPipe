@@ -1,79 +1,75 @@
-cd ~/bactpipe_work/BactPipe
-
-cat > run.sh << 'EOF'
 #!/bin/bash
+
 # BactPipe - Bacterial Analysis Pipeline
-# Usage: bash run.sh
+# Author: Bukhari2917
 
-SAMPLE="sample"
-THREADS=8
-
-DATA_DIR="../Data"
-RESULTS_DIR="../out_results"
+set -e
 
 echo "========================================="
 echo "BactPipe - Bacterial Analysis Pipeline"
 echo "========================================="
 
-# Check if FASTQ files exist
-if [ ! -f "$DATA_DIR/${SAMPLE}_R1.fastq" ]; then
-    echo "ERROR: Cannot find $DATA_DIR/${SAMPLE}_R1.fastq"
-    echo ""
-    echo "Directory structure:"
-    echo "  bactpipe_work/"
-    echo "  ├── Data/          ← Place FASTQ files here"
-    echo "  │   ├── sample_R1.fastq"
-    echo "  │   └── sample_R2.fastq"
-    echo "  ├── out_results/   ← Results appear here"
-    echo "  └── BactPipe/      ← Pipeline code"
-    echo ""
+# Check if Data directory has FASTQ files
+if [ ! -d "../Data" ]; then
+    echo "ERROR: Data directory not found!"
     exit 1
 fi
 
-# Create result directories
-mkdir -p $RESULTS_DIR/{01_fastqc,02_trimmed,03_assembly,04_quast,05_prokka,06_amr,07_virulence,08_mlst}
+# Create results directory
+mkdir -p ../out_results
 
+# Step 1: Quality Control
 echo "[1/8] Quality Control..."
-fastqc $DATA_DIR/${SAMPLE}_R1.fastq $DATA_DIR/${SAMPLE}_R2.fastq -o $RESULTS_DIR/01_fastqc -t $THREADS
+fastqc ../Data/*.fastq -o ../out_results/01_fastqc/ -t 8
 
+# Step 2: Trimming
 echo "[2/8] Trimming Reads..."
-fastp -i $DATA_DIR/${SAMPLE}_R1.fastq -I $DATA_DIR/${SAMPLE}_R2.fastq \
-      -o $RESULTS_DIR/02_trimmed/${SAMPLE}_R1_trimmed.fastq \
-      -O $RESULTS_DIR/02_trimmed/${SAMPLE}_R2_trimmed.fastq \
-      --detect_adapter_for_pe --cut_front --cut_tail \
-      --cut_mean_quality 20 --length_required 50 --thread $THREADS
+fastp -i ../Data/sample_R1.fastq -I ../Data/sample_R2.fastq \
+      -o ../out_results/02_trimmed/trimmed_R1.fastq.gz \
+      -O ../out_results/02_trimmed/trimmed_R2.fastq.gz \
+      --html ../out_results/02_trimmed/fastp_report.html \
+      --thread 8
 
+# Step 3: Assembly
 echo "[3/8] Genome Assembly..."
-spades.py -1 $RESULTS_DIR/02_trimmed/${SAMPLE}_R1_trimmed.fastq \
-          -2 $RESULTS_DIR/02_trimmed/${SAMPLE}_R2_trimmed.fastq \
-          -o $RESULTS_DIR/03_assembly --isolate -t $THREADS -m 32
+spades.py -1 ../out_results/02_trimmed/trimmed_R1.fastq.gz \
+          -2 ../out_results/02_trimmed/trimmed_R2.fastq.gz \
+          -o ../out_results/03_assembly/ \
+          --isolate --threads 8
 
-echo "[4/8] Assembly Quality..."
-quast.py $RESULTS_DIR/03_assembly/contigs.fasta -o $RESULTS_DIR/04_quast -t $THREADS
+# Step 4: Fix Prokka (ADD THIS SECTION)
+echo "[4/8] Fixing Prokka for compatibility..."
+if [ -f "scripts/fix_prokka.sh" ]; then
+    source scripts/fix_prokka.sh
+else
+    # Direct fix if script not found
+    PROKKA_PATH=$(which prokka)
+    sed -i 's/MINVER  => "2.2"/MINVER  => "2.0"/g' "$PROKKA_PATH"
+fi
 
+# Step 5: Annotation
 echo "[5/8] Genome Annotation..."
-~/prokka-1.14.6/bin/prokka $RESULTS_DIR/03_assembly/contigs.fasta \
-       --outdir $RESULTS_DIR/05_prokka \
-       --prefix $SAMPLE --kingdom Bacteria --cpus $THREADS --force
+prokka --outdir ../out_results/05_prokka/ \
+       --prefix sample \
+       --kingdom Bacteria \
+       --addgenes \
+       --cpus 8 \
+       --force \
+       ../out_results/03_assembly/contigs.fasta
 
+# Step 6: AMR Detection
 echo "[6/8] AMR Detection..."
-abricate $RESULTS_DIR/03_assembly/contigs.fasta --db card > $RESULTS_DIR/06_amr/amr_card.tsv
+abricate ../out_results/03_assembly/contigs.fasta > ../out_results/06_amr/amr_card.tsv
 
+# Step 7: Virulence Detection
 echo "[7/8] Virulence Detection..."
-abricate $RESULTS_DIR/03_assembly/contigs.fasta --db vfdb > $RESULTS_DIR/07_virulence/virulence.tsv
+abricate --db vfdb ../out_results/03_assembly/contigs.fasta > ../out_results/07_virulence/virulence.tsv
 
+# Step 8: MLST Typing
 echo "[8/8] MLST Typing..."
-mlst $RESULTS_DIR/03_assembly/contigs.fasta > $RESULTS_DIR/08_mlst/mlst.txt
+mlst ../out_results/03_assembly/contigs.fasta > ../out_results/08_mlst/mlst.txt
 
 echo "========================================="
 echo "PIPELINE COMPLETE!"
+echo "Results are in: ../out_results/"
 echo "========================================="
-echo "Results saved in: $RESULTS_DIR/"
-echo ""
-echo "For circular genome visualization:"
-echo "  File: $RESULTS_DIR/05_prokka/sample.gbk"
-echo "  Upload to: https://proksee.ca/"
-echo "========================================="
-EOF
-
-chmod +x run.sh
