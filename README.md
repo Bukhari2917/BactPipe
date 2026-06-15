@@ -1,22 +1,33 @@
-cd ~/bactpipe_work/BactPipe
+# BactPipe - Bacterial Analysis Pipeline
 
-cat > README.md << 'EOF'
-# BactPipe - Bacterial Genome Analysis Pipeline
+BactPipe is an automated pipeline that analyzes bacterial DNA sequencing data. It takes your raw FASTQ files and produces:
+- Complete bacterial genome assembly
+- Annotated genome with all genes
+- Antibiotic resistance genes (AMR)
+- Virulence factors
+- Bacterial strain type (MLST)
+- Circular genome visualization file
 
-**One command. Complete analysis.**
+> **✅ FIX INCLUDED:** This pipeline automatically fixes the common Prokka error *"Prokka needs blastp 2.2 or higher"*.
 
-## Quick Start
+---
+
+## PART 1: INSTALLATION (One Time Only)
+
+### Step 1: Install Miniconda
 
 ```bash
-# 1. Create directories
-mkdir -p ~/bactpipe_work/Data ~/bactpipe_work/out_results
+# Download Miniconda
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 
-# 2. Clone pipeline
-cd ~/bactpipe_work
-git clone https://github.com/Bukhari2917/BactPipe.git
+# Install it
+bash Miniconda3-latest-Linux-x86_64.sh
 
-# 3. Place FASTQ files in Data/ (rename to sample_R1.fastq, sample_R2.fastq)
+# Follow prompts:
+# - Press Enter to read license
+# - Type 'yes' to accept
+# - Press Enter for default location
+# - Type 'yes' to initialize
 
-# 4. Run pipeline
-cd BactPipe
-bash run.sh
+# Reload terminal
+source ~/.bashrc
