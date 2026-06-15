@@ -10,7 +10,10 @@ process ASSEMBLE {
     
     script:
     """
-    spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${task.cpus}
-    cp spades_out/contigs.fasta .
+    spades.py -1 ${r1} -2 ${r2} -o spades_out --isolate --threads ${task.cpus} --rename
+    
+    # Fix contig names for Prokka
+    awk '/^>/ {print ">contig_" ++i; next} {print}' spades_out/contigs.fasta > spades_out/contigs.fixed.fasta
+    cp spades_out/contigs.fixed.fasta contigs.fasta
     """
 }
