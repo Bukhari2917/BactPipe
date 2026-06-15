@@ -63,7 +63,6 @@ process ASSEMBLY {
               -m ${params.memory.replace('GB','')} \\
               --rename
     
-    # Fix contig names for Prokka
     awk '/^>/ {print ">contig_" ++i; next} {print}' spades_output/contigs.fasta > contigs.fasta
     """
 }
@@ -83,14 +82,7 @@ process PROKKA {
     output: path "*.gff", path "*.gbk", path "*.faa"
     script:
     """
-    # Ensure we are using the FASTA file, not GenBank
-    if [ -f "${assembly}" ]; then
-        INPUT_FILE="${assembly}"
-    else
-        INPUT_FILE="${assembly}/contigs.fasta"
-    fi
-    
-    prokka \${INPUT_FILE} \\
+    prokka ${assembly} \\
            --outdir prokka_out \\
            --prefix sample \\
            --kingdom Bacteria \\
