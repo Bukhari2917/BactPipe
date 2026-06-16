@@ -94,7 +94,7 @@ mkdir -p ../out_results/08_mlst
 mlst ../out_results/03_assembly/contigs.fasta > ../out_results/08_mlst/mlst.txt
 
 # Step 11: eggNOG functional annotation
-echo "[11/11] eggNOG Functional Annotation (COG/KEGG/GO)..."
+echo "[11/11] Functional Annotation (COG/KEGG/GO)..."
 if [ -f "scripts/run_eggnog.sh" ]; then
     bash scripts/run_eggnog.sh
 else
