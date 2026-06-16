@@ -28,7 +28,4 @@ else
     echo "Fix failed"
 fi
 
-# Setup databases
-prokka --setupdb --dbdir ~/prokka_db 2>/dev/null || true
-
 echo "Prokka is now fixed!"
