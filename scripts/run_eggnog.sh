@@ -49,5 +49,4 @@ micromamba run -n eggnog_env emapper.py -i sample.faa \
 echo "========================================="
 echo "eggNOG-mapper complete!"
 echo "Results: ../out_results/09_eggnog/"
-echo "  - functional_annotation.emapper.annotations"
 echo "========================================="
