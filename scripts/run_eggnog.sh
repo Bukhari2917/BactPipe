@@ -31,12 +31,14 @@ fi
 
 # Create environment if not exists
 if ! micromamba env list | grep -q "eggnog_env"; then
+    echo "Creating eggNOG environment..."
     micromamba create -n eggnog_env python=3.9 pip -y
     micromamba run -n eggnog_env pip install eggnog-mapper
 fi
 
 # Run annotation
 cd ../out_results/05_prokka/
+echo "Running eggNOG-mapper on sample.faa..."
 micromamba run -n eggnog_env emapper.py -i sample.faa \
     -o ../09_eggnog/functional_annotation \
     --data_dir $EGGNOG_DB \
@@ -45,5 +47,7 @@ micromamba run -n eggnog_env emapper.py -i sample.faa \
     --override
 
 echo "========================================="
-echo "Complete! Results: ../out_results/09_eggnog/"
+echo "eggNOG-mapper complete!"
+echo "Results: ../out_results/09_eggnog/"
+echo "  - functional_annotation.emapper.annotations"
 echo "========================================="
