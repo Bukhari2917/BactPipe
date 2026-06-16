@@ -18,7 +18,7 @@ if [ ! -f "${PROKKA_PATH}.backup" ]; then
     echo "Backup created"
 fi
 
-# Apply fix (NOTE: TWO spaces before =>)
+# Apply fix (TWO spaces before =>)
 sed -i 's/MINVER  => "2.2"/MINVER  => "2.0"/g' "$PROKKA_PATH"
 
 # Verify
