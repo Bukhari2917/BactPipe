@@ -23,9 +23,9 @@ sed -i 's/MINVER  => "2.2"/MINVER  => "2.0"/g' "$PROKKA_PATH"
 
 # Verify
 if grep -q 'MINVER  => "2.0"' "$PROKKA_PATH"; then
-    echo "✓ Prokka fix applied successfully!"
+    echo "Prokka fix applied successfully!"
 else
-    echo "✗ Fix failed"
+    echo "Fix failed"
 fi
 
 # Setup databases
