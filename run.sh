@@ -72,10 +72,33 @@ prokka --outdir ../out_results/05_prokka/ \
        --force \
        ../out_results/03_assembly/contigs.fasta
 
-# Step 7: Fix GBK file (prevents parsing errors)
-echo "[7/11] Fixing GBK file formatting..."
+# Step 7: Fix GBK file for Proksee (basic fix)
+echo "[7/11] Fixing GBK for Proksee..."
 sed -i 's/NODE_[0-9]*_length_\([0-9]*\)_cov_[0-9.]*/Contig/g' ../out_results/05_prokka/sample.gbk
 sed -i 's/\([0-9]\)\(bp\)/\1 \2/g' ../out_results/05_prokka/sample.gbk
+
+# Step 7b: Create antiSMASH-compatible GBK (complete fix)
+echo "[7b/11] Creating antiSMASH-compatible GBK..."
+cd ../out_results/05_prokka/
+TOTAL_LEN=$(grep -v "^>" ../03_assembly/contigs.fasta | tr -d '\n' | wc -c)
+cat > sample_antismash.gbk << EOF
+LOCUS       BACTERIA                ${TOTAL_LEN} bp    DNA     circular   $(date +%d-%b-%Y | tr '[:lower:]' '[:upper:]')
+DEFINITION  Bacterial genome assembly.
+ACCESSION   SAMPLE00000000
+VERSION     SAMPLE00000000.1
+KEYWORDS    .
+SOURCE      Bacteria
+  ORGANISM  Unclassified bacterium
+FEATURES             Location/Qualifiers
+     source          1..${TOTAL_LEN}
+                     /organism="Unclassified bacterium"
+                     /mol_type="genomic DNA"
+ORIGIN
+EOF
+grep -v "^>" ../03_assembly/contigs.fasta | tr -d '\n' | fold -w 60 | sed 's/^/         /' >> sample_antismash.gbk
+echo "//" >> sample_antismash.gbk
+cd - > /dev/null
+echo "✓ antiSMASH-compatible GBK created: sample_antismash.gbk"
 
 # Step 8: AMR Detection
 echo "[8/11] AMR Detection..."
@@ -105,3 +128,6 @@ echo "========================================="
 echo "PIPELINE COMPLETE!"
 echo "Results are in: ../out_results/"
 echo "========================================="
+echo ""
+echo "📁 For antiSMASH, use: out_results/05_prokka/sample_antismash.gbk"
+echo "📁 For Proksee, use: out_results/05_prokka/sample.gbk"
