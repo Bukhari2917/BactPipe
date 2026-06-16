@@ -16,3 +16,5 @@ dependencies:
   - bedtools=2.30.0
   - samtools=1.16.1
   - multiqc=1.14
+  - matplotlib=3.5.0
+  - pandas=1.4.0
