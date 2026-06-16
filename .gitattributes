@@ -3,3 +3,8 @@
 
 # Shell scripts should use LF line endings
 *.sh text eol=lf
+
+# Keep line endings as is for data files
+*.fastq -text
+*.fasta -text
+*.faa -text
