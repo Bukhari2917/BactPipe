@@ -614,7 +614,3 @@ BactPipe relies on these wonderful open-source tools:
 ---
 
 **Happy Analyzing! 🧬
-
----
-
-*Made with ❤️ by [S.A. Bukhari](https://github.com/Bukhari2917)*
